@@ -145,6 +145,46 @@ def api(method, path, bearer, token, body=None):
     return result
 ```
 
+## Recommended: Session Helpers
+
+For production apps, use the session helpers instead of managing tokens manually. They handle login, proactive refresh, `/getAccountInfo` validation, and auto-retry:
+
+**Python** — [`src/jetnet/session.py`](../src/jetnet/session.py)
+
+```python
+from src.jetnet.session import login, ensure_session, jetnet_request
+
+session = login("you@example.com", "password", "https://customer.jetnetconnect.com")
+session = ensure_session(session)
+result = jetnet_request("GET", "/api/Aircraft/getRegNumber/N1KE/{apiToken}", session)
+```
+
+**JavaScript** — [`src/jetnet/session.js`](../src/jetnet/session.js)
+
+```javascript
+import { createSession, login, ensureSession, jetnetRequest } from "../../src/jetnet/session.js";
+
+let session = createSession(email, password, baseUrl);
+session = await login(session);
+session = await ensureSession(session);
+const result = await jetnetRequest("GET", `/api/Aircraft/getRegNumber/N1KE/{apiToken}`, session);
+```
+
+## Token Validation with /getAccountInfo
+
+`GET /api/Utility/getAccountInfo/{apiToken}` is a lightweight endpoint that returns your account details. Use it as a health check before long workflows:
+
+- Cheap call — no data payload, fast response
+- If it returns a valid response, your token is good
+- If it returns `INVALID SECURITY TOKEN`, re-login once and retry
+- The session helpers call this automatically via `ensure_session()`
+
+To measure the actual TTL for your tenant:
+
+```bash
+python scripts/token_probe.py
+```
+
 ## Security Best Practices
 
 - Never expose tokens in client-side code (browser or mobile app)

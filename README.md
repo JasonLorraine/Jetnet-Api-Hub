@@ -5,14 +5,19 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 **Base URL:** `https://customer.jetnetconnect.com`
 **Swagger:** `https://customer.jetnetconnect.com/swagger/index.html`
 
+> **New here?** Go to **[START_HERE.md](START_HERE.md)** -- pick your path and get running in minutes.
+
 ---
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Token Validation Strategy](#token-validation-strategy)
 - [Repository Structure](#repository-structure)
 - [The Golden Path](#the-golden-path)
 - [Documentation](#documentation)
+- [Templates](#templates)
+- [Prompts (AI-Native)](#prompts-ai-native)
 - [Code Examples](#code-examples)
 - [Quick Reference Snippets](#quick-reference-snippets)
 - [Helper Scripts](#helper-scripts)
@@ -34,6 +39,8 @@ export JETNET_PASSWORD="your_password"
 
 ### 2. Authenticate
 
+> **Guardrail: `emailAddress` casing.** The field is `emailAddress` with a capital **A**. Using `emailaddress`, `email`, or `email_address` will fail silently.
+
 **Python**
 
 ```python
@@ -42,14 +49,14 @@ import requests, os
 BASE = "https://customer.jetnetconnect.com"
 
 r = requests.post(f"{BASE}/api/Admin/APILogin", json={
-    "emailAddress": os.environ["JETNET_EMAIL"],   # capital A in emailAddress
+    "emailAddress": os.environ["JETNET_EMAIL"],   # capital A -- not emailaddress
     "password": os.environ["JETNET_PASSWORD"]
 })
 r.raise_for_status()
 data = r.json()
 
-bearer = data["bearerToken"]
-token  = data["apiToken"]
+bearer = data["bearerToken"]   # goes in Authorization header
+token  = data["apiToken"]      # goes in URL path -- never in headers or body
 print(f"Authenticated. Token: {token[:8]}...")
 ```
 
@@ -63,26 +70,65 @@ const PASS  = process.env.JETNET_PASSWORD;
 const r = await fetch(`${BASE}/api/Admin/APILogin`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ emailAddress: EMAIL, password: PASS })
+  body: JSON.stringify({ emailAddress: EMAIL, password: PASS })  // capital A
 });
 const data = await r.json();
 
-const bearer = data.bearerToken;
-const token  = data.apiToken;
+const bearer = data.bearerToken;  // goes in Authorization header
+const token  = data.apiToken;     // goes in URL path -- never in headers or body
 console.log(`Authenticated. Token: ${token.slice(0, 8)}...`);
 ```
 
+> **Guardrail: Token placement.** `bearerToken` goes in the `Authorization: Bearer {bearerToken}` header. `apiToken` goes in the URL path (e.g. `/getRegNumber/N1KE/{apiToken}`). Do not swap them.
+
 ### 3. Look up an aircraft by tail number
+
+> **Guardrail: HTTP 200 does not mean success.** Always check `responsestatus` in the JSON body before using the data.
 
 ```python
 headers = {"Authorization": f"Bearer {bearer}"}
 r = requests.get(f"{BASE}/api/Aircraft/getRegNumber/N650GD/{token}", headers=headers)
-aircraft = r.json()["aircraftresult"]
+result = r.json()
 
+# Always check responsestatus -- HTTP 200 does not mean success
+status = result.get("responsestatus", "")
+if "ERROR" in status.upper():
+    raise ValueError(f"JETNET error: {status}")
+
+aircraft = result["aircraftresult"]
 print(f"{aircraft['regnbr']} | {aircraft['make']} {aircraft['model']} | SN: {aircraft['serialnbr']}")
 ```
 
+> **Guardrail: Date format.** All date fields require `MM/DD/YYYY` with leading zeros. Use `"01/01/2024"` not `"1/1/2024"`. Month comes first (not day).
+
 That's it. You're connected.
+
+For production apps, use the session helpers instead of managing tokens manually:
+- **Python:** [`src/jetnet/session.py`](src/jetnet/session.py)
+- **JavaScript:** [`src/jetnet/session.js`](src/jetnet/session.js)
+
+## Token Validation Strategy
+
+Tokens expire after 60 minutes. We validate via `/getAccountInfo` and auto re-login once.
+
+```python
+from src.jetnet.session import login, ensure_session, jetnet_request
+
+session = login("you@example.com", "password", "https://customer.jetnetconnect.com")
+
+session = ensure_session(session)
+
+result = jetnet_request("GET", "/api/Aircraft/getRegNumber/N1KE/{apiToken}", session)
+```
+
+The session helpers handle everything: proactive refresh at 50 minutes, validation via `/getAccountInfo`, and one automatic retry on `INVALID SECURITY TOKEN`.
+
+To observe the actual TTL for your tenant:
+
+```bash
+python scripts/token_probe.py
+# Output: "Observed token TTL: 57m 12s"
+```
 
 ---
 
@@ -92,14 +138,30 @@ That's it. You're connected.
 jetnet-api-docs/
 │
 ├── README.md                           ← You are here
+├── START_HERE.md                       ← Choose your path (new here? start here)
+│
+├── src/jetnet/                         ← Session helpers (auto-refresh, validation)
+│   ├── session.py                      ← Python session module
+│   └── session.js                      ← JavaScript session module
 │
 ├── docs/                               ← Core documentation
 │   ├── authentication.md               ← Login, tokens, refresh, retry
 │   ├── pagination.md                   ← Paged endpoints, loop patterns
 │   ├── response-handling.md            ← Response structure, schema differences
+│   ├── response-shapes.md             ← Normalized UI contracts (AircraftCard, etc.)
 │   ├── id-system.md                    ← aircraftid vs regnbr vs modelid
 │   ├── common-mistakes.md              ← Every gotcha and how to fix it
 │   └── enum-reference.md              ← Valid values for every enum field
+│
+├── templates/                          ← One-click starter apps
+│   ├── nextjs-tail-lookup/            ← Next.js tail lookup UI
+│   └── python-fastapi-golden-path/    ← FastAPI backend (Golden Path)
+│
+├── prompts/                            ← AI prompts (paste into Cursor/Copilot)
+│   ├── 01_golden_path_tail_lookup_app.md
+│   ├── 02_fbo_airport_activity_leads.md
+│   ├── 03_fleet_watchlist_alerts.md
+│   └── 04_bulk_export_pipeline.md
 │
 ├── examples/                           ← Complete runnable examples
 │   ├── python/                         ← Python examples (requests + Flask)
@@ -130,7 +192,8 @@ jetnet-api-docs/
 │
 ├── scripts/                            ← Production-ready helper utilities
 │   ├── paginate.py                     ← Generic pagination helper
-│   └── validate_payload.py            ← Payload validator (catches mistakes)
+│   ├── validate_payload.py            ← Payload validator (catches mistakes)
+│   └── token_probe.py                 ← Measure actual token TTL
 │
 └── references/                         ← Complete reference material
     ├── endpoints.md                    ← Every endpoint with parameters
@@ -169,9 +232,38 @@ See the full working implementation:
 | [Authentication](docs/authentication.md) | Login, token handling, refresh strategy, retry pattern |
 | [Pagination](docs/pagination.md) | Paged endpoints, loop patterns, maxpages quirks |
 | [Response Handling](docs/response-handling.md) | Response structure, schema differences by endpoint |
+| [Response Shapes](docs/response-shapes.md) | Normalized UI contracts: AircraftCard, CompanyCard, GoldenPathResult |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |
+
+---
+
+## Templates
+
+Starter apps that run out of the box. Copy `.env.example` to `.env`, add your credentials, and go.
+
+| Template | Stack | What it does |
+|----------|-------|-------------|
+| [nextjs-tail-lookup](templates/nextjs-tail-lookup/) | Next.js (App Router) | Tail number input → aircraft card + owner/operator |
+| [python-fastapi-golden-path](templates/python-fastapi-golden-path/) | FastAPI + requests | `/lookup?tail=N12345` → normalized GoldenPathResult |
+
+Both templates use session helpers with `/getAccountInfo` health checks and auto token refresh.
+
+---
+
+## Prompts (AI-Native)
+
+Copy-paste these into Cursor, Copilot, or ChatGPT to generate working apps that follow JETNET best practices.
+
+| Prompt | Use case |
+|--------|----------|
+| [01 Golden Path Tail Lookup](prompts/01_golden_path_tail_lookup_app.md) | Build a tail lookup app with aircraft card + owner/operator |
+| [02 FBO Airport Activity Leads](prompts/02_fbo_airport_activity_leads.md) | Airport-based flight activity for FBO lead generation |
+| [03 Fleet Watchlist Alerts](prompts/03_fleet_watchlist_alerts.md) | Monitor a fleet by model, alert on ownership changes |
+| [04 Bulk Export Pipeline](prompts/04_bulk_export_pipeline.md) | Paginated bulk export with incremental sync |
+
+Each prompt includes the exact API call sequence, error handling rules, and references the session helpers. See [`prompts/README.md`](prompts/README.md) for how to use them.
 
 ---
 
@@ -219,6 +311,19 @@ Copy-paste-ready code for the most common tasks:
 
 ---
 
+## Session Helpers
+
+Production-ready session modules that handle login, token refresh, and validation automatically:
+
+| Module | Language | Features |
+|--------|----------|----------|
+| [`src/jetnet/session.py`](src/jetnet/session.py) | Python | `login()`, `ensure_session()`, `jetnet_request()`, `normalize_error()` |
+| [`src/jetnet/session.js`](src/jetnet/session.js) | JavaScript | `createSession()`, `ensureSession()`, `jetnetRequest()`, `normalizeError()` |
+
+Both modules validate tokens via `/getAccountInfo`, proactively refresh at 50 minutes, and auto re-login once on `INVALID SECURITY TOKEN`.
+
+---
+
 ## Helper Scripts
 
 ### [`scripts/paginate.py`](scripts/paginate.py)
@@ -262,6 +367,16 @@ errors = validate("getHistoryListPaged", {
 })
 for e in errors:
     print(f"  ERROR: {e}")
+```
+
+### [`scripts/token_probe.py`](scripts/token_probe.py)
+
+Measures the practical token TTL for your account by polling `/getAccountInfo` until failure.
+
+```bash
+python scripts/token_probe.py
+# Output: "Observed token TTL: 57m 12s"
+# Results saved to .cache/token_probe.json
 ```
 
 ---
