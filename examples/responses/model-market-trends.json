@@ -1,0 +1,67 @@
+{
+  "_comment": "getModelMarketTrends -- monthly market summary per model",
+  "endpoint": "POST /api/Model/getModelMarketTrends/{apiToken}",
+  "tier": "B",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Model/getModelMarketTrends/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "airframetype": "None",
+      "maketype": "None",
+      "productcode": ["None"],
+      "modelid": 0,
+      "make": "ASTRA",
+      "modlist": [23, 24, 25],
+      "displayRange": 6,
+      "startdate": "01/01/2024"
+    }
+  },
+  "response": {
+    "responseid": "555665264",
+    "responsestatus": "SUCCESS",
+    "count": 21,
+    "modelMarketTrends": [
+      {
+        "modelicao": "ASTR",
+        "modelid": 23,
+        "maketype": "BusinessJet",
+        "make": "ASTRA",
+        "model": "1125",
+        "categorysize": "Mid-Size Jet",
+        "trend_product": "Business",
+        "trend_year": 2024,
+        "trend_month": 1,
+        "trend_snapshot_date": "2024-01-31T00:00:00",
+        "aircraft_for_sale_count": 4,
+        "in_operation_count": 13,
+        "end_user_count": 2,
+        "user_exclusive_count": 2,
+        "dealer_owned_count": 0,
+        "domestic_count": 3,
+        "international_count": 1,
+        "avg_asking_price": 895000,
+        "high_asking_price": 895000,
+        "low_asking_price": 895000,
+        "make_offer_count": 3,
+        "avg_year": 1987,
+        "avg_daysonmarket": 225,
+        "avg_airframe_time": 8925,
+        "avg_engine_time": 9843,
+        "avail_new_onmarket_count": 0
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'modelMarketTrends' -- camelCase with capital M (not 'modelmarkettrends')",
+    "one record per model per month",
+    "count = total records returned (models x months)",
+    "productcode: ['None'] = use your subscription's enabled product codes",
+    "displayRange = number of months starting from startdate",
+    "historical data available back to 1988",
+    "key analytics fields: avg_asking_price, aircraft_for_sale_count, avg_daysonmarket"
+  ]
+}

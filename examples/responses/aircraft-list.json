@@ -1,0 +1,79 @@
+{
+  "_comment": "getAircraftList -- search/filter aircraft (NOT paginated -- returns all at once)",
+  "endpoint": "POST /api/Aircraft/getAircraftList/{apiToken}",
+  "tier": "A",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getAircraftList/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "airframetype": "None",
+      "maketype": "businessjet",
+      "sernbr": "",
+      "regnbr": "",
+      "regnbrlist": [],
+      "modelid": 0,
+      "make": "",
+      "forsale": "true",
+      "lifecycle": "InOperation",
+      "basestate": [],
+      "basestatename": [],
+      "basecountry": "US",
+      "basecountrylist": [],
+      "basecode": "",
+      "actiondate": "",
+      "companyid": 0,
+      "complist": [],
+      "contactid": 0,
+      "yearmfr": 0,
+      "yeardlv": 0,
+      "aircraftchanges": "false",
+      "aclist": [],
+      "modlist": [145, 634],
+      "exactMatchReg": false
+    }
+  },
+  "response": {
+    "responseid": "555669000",
+    "responsestatus": "SUCCESS",
+    "count": 47,
+    "aircraft": [
+      {
+        "aircraftid": 115640,
+        "make": "GULFSTREAM",
+        "model": "G550",
+        "modelid": 145,
+        "sernbr": "5001",
+        "regnbr": "N550GA",
+        "yearmfr": 2008,
+        "yeardlv": 2009,
+        "forsale": "true",
+        "exclusive": "false",
+        "leased": "false",
+        "marketstatus": "For Sale",
+        "asking": 18500000,
+        "askingprice": "$18,500,000",
+        "listdate": "2024-03-15T00:00:00",
+        "basecity": "Dallas",
+        "basestate": "Texas",
+        "basecountry": "United States",
+        "baseicaocode": "KDAL",
+        "aftt": 6823,
+        "estaftt": 6823,
+        "lifecycle": "InOperation"
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'aircraft' (not 'aircraftlist' or 'airplanes')",
+    "getAircraftList has NO paged variant -- returns all matching records at once",
+    "forsale, exclusive, leased are STRING booleans: '\"true\"' and '\"false\"', not JSON booleans",
+    "forsale in the REQUEST body is also a string: '\"true\"', '\"false\"', or '\"\"' to ignore",
+    "maketype is case-insensitive in requests: 'businessjet' = 'BusinessJet'",
+    "no companyrelationships in this response -- lightweight list only",
+    "use modlist + forsale + lifecycle + basecountry to keep results manageable"
+  ]
+}

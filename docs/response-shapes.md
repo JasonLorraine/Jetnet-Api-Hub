@@ -1,291 +1,441 @@
-# Response Shapes
+# JETNET Response Shapes -- Normalized Contracts
 
-Normalized UI contracts for building frontends, mobile apps, and CRM integrations on top of JETNET data. Never pass raw JETNET responses directly to a client — map them to these stable shapes first.
+This document defines three canonical data shapes that normalize JETNET's five raw
+response schemas into a consistent interface for UI and pipeline code.
+
+Use these shapes as your application's internal data model. Transform raw JETNET
+responses into these shapes at the API boundary -- never spread raw field names
+(`owrfname`, `companyrelation`, `contactfirstname`) through your UI components.
 
 ---
 
-## AircraftCard
+## Why Normalize?
 
-The core aircraft identity object. Every UI that shows an aircraft should render this shape.
+JETNET returns company/contact data in five different schemas depending on the
+endpoint. See the Schema Mapping Quick Reference below for the comparison table.
+Normalizing at ingestion means your UI components, CRM mappers, and export jobs
+only deal with one shape.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `aircraftId` | integer | JETNET internal aircraft ID — the universal join key |
-| `regNbr` | string | Registration / tail number (e.g. `"N123AB"`) |
-| `serialNbr` | string | Manufacturer serial number |
-| `make` | string | Aircraft make (e.g. `"GULFSTREAM"`) |
-| `model` | string | Aircraft model (e.g. `"G650"`) |
-| `year` | integer \| null | Year manufactured (`yearmfr`) or year delivered (`yeardlv`) — use whichever is present |
-| `ownerCompanyId` | integer \| null | Company ID of the current owner (if resolved) |
-| `operatorCompanyId` | integer \| null | Company ID of the current operator (if resolved) |
+---
 
-```json
-{
-  "aircraftId": 211461,
-  "regNbr": "N123AB",
-  "serialNbr": "6302",
-  "make": "GULFSTREAM",
-  "model": "G650",
-  "year": 2018,
-  "ownerCompanyId": 4425,
-  "operatorCompanyId": 5678
+## 1. AircraftCard
+
+Canonical aircraft summary. Produced by tail-lookup, aircraft list, and bulk export.
+
+```typescript
+interface AircraftCard {
+  // Identity
+  aircraftId: number
+  modelId: number
+  tailNumber: string       // regnbr
+  serialNumber: string     // sernbr / serialnbr
+  make: string             // e.g. "GULFSTREAM"
+  model: string            // e.g. "G550"
+  yearMfr: number
+  yearDelivered: number
+
+  // Classification
+  makeType: string         // "BusinessJet" | "Turboprop" | "Piston" | ...
+  airframeType: string     // "FixedWing" | "Rotorcraft"
+  weightClass: string      // "Light" | "Midsize" | "Heavy" | ...
+  categorySize: string     // "Light Jet" | "Large Long-Range Jet" | ...
+
+  // Status
+  lifecycle: string        // "InOperation" | "Written Off" | ...
+  usage: string            // "Business" | "Charter" | ...
+  ownership: string        // "Wholly Owned" | "Fractional" | ...
+  forSale: boolean
+  askingPrice: string | null  // "Inquire" or dollar string or null
+  marketStatus: string | null
+
+  // Home base
+  baseIcao: string | null
+  baseAirport: string | null
+  baseCountry: string | null
+  baseContinent: string | null
+
+  // Airframe metrics
+  estimatedAFTT: number | null
+  estimatedCycles: number | null
+  estimatedFlightHours: number | null
+
+  // Relationships (normalized -- see CompanyCard below)
+  owner: CompanyCard | null
+  operator: CompanyCard | null
+  chiefPilot: ContactCard | null
+  exclusiveBrokers: CompanyCard[]
+  additionalRelations: RelationCard[]
 }
+```
+
+### Python factory (from getRegNumber / tail lookup)
+
+```python
+def aircraft_card_from_regnbr(raw: dict) -> dict:
+    ac = raw.get("aircraftresult", raw)
+    rels = ac.get("companyrelationships", [])
+    owner = next((r for r in rels if r["companyrelation"] == "Owner"), None)
+    operator = next((r for r in rels if r["companyrelation"] == "Operator"), None)
+    return {
+        "aircraftId": ac.get("aircraftid"),
+        "modelId": ac.get("modelid"),
+        "tailNumber": ac.get("regnbr"),
+        "serialNumber": ac.get("serialnbr") or ac.get("sernbr"),
+        "make": ac.get("make"),
+        "model": ac.get("model"),
+        "yearMfr": ac.get("yearmfr"),
+        "yearDelivered": ac.get("yeardlv"),
+        "makeType": ac.get("maketype"),
+        "airframeType": ac.get("airframetype"),
+        "weightClass": ac.get("weightclass"),
+        "categorySize": ac.get("categorysize"),
+        "lifecycle": ac.get("lifecycle"),
+        "usage": ac.get("usage"),
+        "ownership": ac.get("ownership"),
+        "forSale": bool(ac.get("forsale")),
+        "askingPrice": None,
+        "marketStatus": None,
+        "baseIcao": ac.get("baseicao"),
+        "baseAirport": ac.get("baseairport"),
+        "baseCountry": ac.get("basecountry"),
+        "baseContinent": ac.get("basecontinent"),
+        "estimatedAFTT": ac.get("estaftt"),
+        "estimatedCycles": ac.get("estcycles"),
+        "estimatedFlightHours": None,
+        "owner": company_card_from_flat(owner) if owner else None,
+        "operator": company_card_from_flat(operator) if operator else None,
+        "chiefPilot": None,
+        "exclusiveBrokers": [],
+        "additionalRelations": [],
+    }
+```
+
+### Python factory (from getBulkAircraftExportPaged -- flat owr*/opr*/chp* schema)
+
+```python
+def aircraft_card_from_bulk(raw: dict) -> dict:
+    for_sale_raw = raw.get("forsale", "N")
+    for_sale = for_sale_raw == "Y" if isinstance(for_sale_raw, str) else bool(for_sale_raw)
+
+    owner = None
+    if raw.get("owrcompid"):
+        owner = {
+            "companyId": raw["owrcompid"],
+            "name": raw.get("owrcompanyname"),
+            "city": raw.get("owrcity"),
+            "state": raw.get("owrstate"),
+            "country": raw.get("owrcountry"),
+            "phone": raw.get("owrphone1"),
+            "email": raw.get("owremail"),
+            "contact": {
+                "contactId": raw.get("owrcontactid"),
+                "firstName": raw.get("owrfname"),
+                "lastName": raw.get("owrlname"),
+                "title": raw.get("owrtitle"),
+                "email": raw.get("owremail"),
+                "phone": raw.get("owrphone1"),
+            },
+        }
+    return {
+        "aircraftId": raw.get("aircraftid"),
+        "modelId": raw.get("modelid"),
+        "tailNumber": raw.get("regnbr"),
+        "serialNumber": raw.get("sernbr"),
+        "make": raw.get("make"),
+        "model": raw.get("model"),
+        "yearMfr": raw.get("yearmfr"),
+        "yearDelivered": raw.get("yeardelivered"),
+        "makeType": raw.get("maketype"),
+        "airframeType": raw.get("airframetype"),
+        "lifecycle": raw.get("lifecycle"),
+        "forSale": for_sale,
+        "askingPrice": raw.get("asking"),
+        "marketStatus": raw.get("status"),
+        "estimatedAFTT": raw.get("estaftt"),
+        "estimatedCycles": raw.get("estcycles"),
+        "estimatedFlightHours": raw.get("estflighthrs"),
+        "owner": owner,
+        "operator": None,   # map opr* similarly if needed
+        "chiefPilot": None, # map chp* if needed
+        "exclusiveBrokers": [],
+        "additionalRelations": [],
+    }
 ```
 
 ---
 
-## CompanyCard
+## 2. CompanyCard
 
-Represents an owner, operator, or any company related to an aircraft.
+Canonical company + primary contact. Used as a nested shape inside AircraftCard
+and as a standalone for CRM upsert operations.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `companyId` | integer | JETNET company ID |
-| `companyName` | string | Legal or display name |
-| `segment` | string \| null | Business segment (e.g. `"Corporate"`, `"Charter"`) |
-| `location` | string \| null | City/state/country summary |
-| `primaryPhone` | string \| null | Main phone number |
-
-```json
-{
-  "companyId": 4425,
-  "companyName": "Acme Aviation LLC",
-  "segment": "Corporate",
-  "location": "Teterboro, NJ, US",
-  "primaryPhone": "+1-201-555-0100"
+```typescript
+interface ContactCard {
+  contactId: number | null
+  firstName: string | null
+  lastName: string | null
+  fullName: string          // computed: firstName + ' ' + lastName
+  title: string | null
+  email: string | null
+  phone: string | null      // best available phone
+  officePhone: string | null
+  mobilePhone: string | null
 }
+
+interface CompanyCard {
+  companyId: number
+  name: string
+  address1: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  postCode: string | null
+  email: string | null
+  phone: string | null      // office phone
+  businessType: string | null
+  agencyType: string | null
+  contact: ContactCard | null
+}
+```
+
+### Python factory (from getRegNumber flat companyrelationships)
+
+```python
+def company_card_from_flat(rel: dict) -> dict:
+    """
+    Normalize a flat getRegNumber companyrelationships entry.
+    Field prefix: company* for company, contact* for contact.
+    """
+    first = rel.get("contactfirstname") or ""
+    last  = rel.get("contactlastname") or ""
+    return {
+        "companyId":   rel.get("companyid"),
+        "name":        rel.get("companyname"),
+        "address1":    rel.get("companyaddress1"),
+        "city":        rel.get("companycity"),
+        "state":       rel.get("companystate") or rel.get("companystateabbr"),
+        "country":     rel.get("companycountry"),
+        "postCode":    rel.get("companypostcode"),
+        "email":       rel.get("companyemail"),
+        "phone":       rel.get("companyofficephone"),
+        "businessType": rel.get("companybusinesstype"),
+        "agencyType":  rel.get("companyagencytype"),
+        "contact": {
+            "contactId":   rel.get("contactid"),
+            "firstName":   first,
+            "lastName":    last,
+            "fullName":    f"{first} {last}".strip(),
+            "title":       rel.get("contacttitle"),
+            "email":       rel.get("contactemail"),
+            "phone":       rel.get("contactbestphone"),
+            "officePhone": rel.get("contactofficephone"),
+            "mobilePhone": rel.get("contactmobilephone"),
+        },
+    }
+```
+
+### Python factory (from getRelationships / getHistoryList nested schema)
+
+```python
+def company_card_from_nested(rel: dict) -> dict:
+    """
+    Normalize a nested getRelationships / getHistoryList companyrelationships entry.
+    Has sub-objects: rel['company'] and rel['contact'].
+    """
+    co = rel.get("company") or {}
+    ct = rel.get("contact") or {}
+    first = ct.get("firstname") or ""
+    last  = ct.get("lastname") or ""
+    return {
+        "companyId":    co.get("companyid") or rel.get("companyid"),
+        "name":         co.get("name") or rel.get("name"),
+        "address1":     co.get("address1"),
+        "city":         co.get("city"),
+        "state":        co.get("state"),
+        "country":      co.get("country"),
+        "postCode":     co.get("postcode"),
+        "email":        co.get("email"),
+        "phone":        co.get("office"),
+        "businessType": rel.get("businesstype"),
+        "agencyType":   None,
+        "contact": {
+            "contactId":   ct.get("contactid") or rel.get("contactid"),
+            "firstName":   first,
+            "lastName":    last,
+            "fullName":    f"{first} {last}".strip(),
+            "title":       ct.get("title"),
+            "email":       ct.get("email"),
+            "phone":       ct.get("office") or ct.get("mobile"),
+            "officePhone": ct.get("office"),
+            "mobilePhone": ct.get("mobile"),
+        },
+    }
 ```
 
 ---
 
-## GoldenPathResult
+## 3. GoldenPathResult
 
-The full response for the "enter a tail number, get a profile" workflow. This is the shape your `/lookup` or `/profile` endpoint should return.
+The "golden path" shape: everything a front-end component or CRM trigger needs in
+one flat dict. Produced by combining AircraftCard + ownership history + market data.
+Designed for the Next.js tail-lookup template and CRM enrichment pipelines.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `aircraft` | AircraftCard | Core aircraft identity (always present) |
-| `owner` | CompanyCard \| null | Current owner, if resolved |
-| `operator` | CompanyCard \| null | Current operator, if resolved |
-| `utilization` | object \| null | Flight activity summary for a recent window |
-| `_debug` | object | Raw endpoint responses for troubleshooting (strip in production) |
+```typescript
+interface GoldenPathResult {
+  // Aircraft identity (from AircraftCard)
+  aircraftId: number
+  tailNumber: string
+  make: string
+  model: string
+  yearMfr: number
+  yearDelivered: number
+  categorySize: string
+  weightClass: string
 
-```json
-{
-  "aircraft": {
-    "aircraftId": 211461,
-    "regNbr": "N123AB",
-    "serialNbr": "6302",
-    "make": "GULFSTREAM",
-    "model": "G650",
-    "year": 2018,
-    "ownerCompanyId": 4425,
-    "operatorCompanyId": 5678
-  },
-  "owner": {
-    "companyId": 4425,
-    "companyName": "Acme Aviation LLC",
-    "segment": "Corporate",
-    "location": "Teterboro, NJ, US",
-    "primaryPhone": "+1-201-555-0100"
-  },
-  "operator": {
-    "companyId": 5678,
-    "companyName": "Flight Ops Inc",
-    "segment": "Management",
-    "location": "White Plains, NY, US",
-    "primaryPhone": "+1-914-555-0200"
-  },
-  "utilization": {
-    "periodDays": 180,
-    "totalFlights": 47,
-    "totalHours": 132.5,
-    "topOrigin": "KTEB",
-    "topDestination": "KPBI"
-  },
-  "_debug": {
-    "endpoints": [
-      "getRegNumber",
-      "getRelationships",
-      "getFlightDataPaged"
-    ],
-    "rawResponsestatuses": [
-      "SUCCESS",
-      "SUCCESS",
-      "SUCCESS: PAGE [ 1 of 1 ]"
-    ]
+  // Market status
+  forSale: boolean
+  askingPrice: string | null
+  marketStatus: string | null
+
+  // Current owner + operator (from AircraftCard)
+  owner: CompanyCard | null
+  operator: CompanyCard | null
+  chiefPilot: ContactCard | null
+
+  // Home base
+  baseIcao: string | null
+  baseAirport: string | null
+  baseCountry: string | null
+
+  // Enrichment metadata
+  jetnetPageUrl: string | null    // link to JETNET Evolution detail page
+  lastUpdated: string | null      // ISO datetime of last JETNET update
+  dataSource: string              // always "JETNET"
+}
+```
+
+### Python factory
+
+```python
+def golden_path_result(
+    aircraft_card: dict,
+    jetnet_page_url: str | None = None,
+    last_updated: str | None = None,
+) -> dict:
+    """
+    Produce a GoldenPathResult from a normalized AircraftCard.
+    """
+    return {
+        "aircraftId":    aircraft_card["aircraftId"],
+        "tailNumber":    aircraft_card["tailNumber"],
+        "make":          aircraft_card["make"],
+        "model":         aircraft_card["model"],
+        "yearMfr":       aircraft_card["yearMfr"],
+        "yearDelivered": aircraft_card["yearDelivered"],
+        "categorySize":  aircraft_card.get("categorySize"),
+        "weightClass":   aircraft_card.get("weightClass"),
+        "forSale":       aircraft_card.get("forSale", False),
+        "askingPrice":   aircraft_card.get("askingPrice"),
+        "marketStatus":  aircraft_card.get("marketStatus"),
+        "owner":         aircraft_card.get("owner"),
+        "operator":      aircraft_card.get("operator"),
+        "chiefPilot":    aircraft_card.get("chiefPilot"),
+        "baseIcao":      aircraft_card.get("baseIcao"),
+        "baseAirport":   aircraft_card.get("baseAirport"),
+        "baseCountry":   aircraft_card.get("baseCountry"),
+        "jetnetPageUrl": jetnet_page_url,
+        "lastUpdated":   last_updated,
+        "dataSource":    "JETNET",
+    }
+```
+
+---
+
+## Schema Mapping Quick Reference
+
+| Field in GoldenPathResult | getRegNumber (flat) | getBulkExport (prefixed) | getRelationships (nested) |
+|---|---|---|---|
+| owner.companyId | `companyid` | `owrcompid` | `company.companyid` |
+| owner.name | `companyname` | `owrcompanyname` | `company.name` |
+| owner.contact.firstName | `contactfirstname` | `owrfname` | `contact.firstname` |
+| owner.contact.lastName | `contactlastname` | `owrlname` | `contact.lastname` |
+| owner.contact.title | `contacttitle` | `owrtitle` | `contact.title` |
+| owner.contact.email | `contactemail` | `owremail` | `contact.email` |
+| owner.contact.phone | `contactbestphone` | `owrphone1` | `contact.office` |
+| relation field | `companyrelation` | prefix (`owr*`) | `relationtype` |
+
+---
+
+## TypeScript Utility (Next.js)
+
+```typescript
+// lib/normalize.ts
+
+export function companyCardFromFlat(rel: Record<string, unknown>): CompanyCard {
+  const first = String(rel['contactfirstname'] ?? '')
+  const last = String(rel['contactlastname'] ?? '')
+  return {
+    companyId: Number(rel['companyid']),
+    name: String(rel['companyname'] ?? ''),
+    address1: (rel['companyaddress1'] as string) ?? null,
+    city: (rel['companycity'] as string) ?? null,
+    state: (rel['companystateabbr'] as string) ?? null,
+    country: (rel['companycountry'] as string) ?? null,
+    postCode: (rel['companypostcode'] as string) ?? null,
+    email: (rel['companyemail'] as string) || null,
+    phone: (rel['companyofficephone'] as string) ?? null,
+    businessType: (rel['companybusinesstype'] as string) ?? null,
+    agencyType: (rel['companyagencytype'] as string) ?? null,
+    contact: {
+      contactId: rel['contactid'] ? Number(rel['contactid']) : null,
+      firstName: first || null,
+      lastName: last || null,
+      fullName: [first, last].filter(Boolean).join(' '),
+      title: (rel['contacttitle'] as string) ?? null,
+      email: (rel['contactemail'] as string) ?? null,
+      phone: (rel['contactbestphone'] as string) ?? null,
+      officePhone: (rel['contactofficephone'] as string) ?? null,
+      mobilePhone: (rel['contactmobilephone'] as string) ?? null,
+    },
+  }
+}
+
+export function aircraftCardFromRegNbr(raw: Record<string, unknown>): AircraftCard {
+  const ac = (raw['aircraftresult'] as Record<string, unknown>) ?? raw
+  const rels = (ac['companyrelationships'] as Record<string, unknown>[]) ?? []
+  const ownerRel = rels.find(r => r['companyrelation'] === 'Owner') ?? null
+  const opRel = rels.find(r => r['companyrelation'] === 'Operator') ?? null
+  return {
+    aircraftId: Number(ac['aircraftid']),
+    modelId: Number(ac['modelid']),
+    tailNumber: String(ac['regnbr'] ?? ''),
+    serialNumber: String(ac['serialnbr'] ?? ac['sernbr'] ?? ''),
+    make: String(ac['make'] ?? ''),
+    model: String(ac['model'] ?? ''),
+    yearMfr: Number(ac['yearmfr']),
+    yearDelivered: Number(ac['yeardlv'] ?? ac['yeardelivered']),
+    makeType: String(ac['maketype'] ?? ''),
+    airframeType: String(ac['airframetype'] ?? ''),
+    weightClass: String(ac['weightclass'] ?? ''),
+    categorySize: String(ac['categorysize'] ?? ''),
+    lifecycle: String(ac['lifecycle'] ?? ''),
+    usage: String(ac['usage'] ?? ''),
+    ownership: String(ac['ownership'] ?? ''),
+    forSale: Boolean(ac['forsale']),
+    askingPrice: null,
+    marketStatus: null,
+    baseIcao: (ac['baseicao'] as string) ?? null,
+    baseAirport: (ac['baseairport'] as string) ?? null,
+    baseCountry: (ac['basecountry'] as string) ?? null,
+    baseContinent: (ac['basecontinent'] as string) ?? null,
+    estimatedAFTT: ac['estaftt'] != null ? Number(ac['estaftt']) : null,
+    estimatedCycles: ac['estcycles'] != null ? Number(ac['estcycles']) : null,
+    estimatedFlightHours: null,
+    owner: ownerRel ? companyCardFromFlat(ownerRel) : null,
+    operator: opRel ? companyCardFromFlat(opRel) : null,
+    chiefPilot: null,
+    exclusiveBrokers: [],
+    additionalRelations: [],
   }
 }
 ```
-
----
-
-## Error
-
-Normalized error shape. Every error response your backend emits should follow this contract so the frontend has a single error-handling path.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `code` | string | Machine-readable error code (e.g. `"AIRCRAFT_NOT_FOUND"`, `"AUTH_FAILED"`, `"JETNET_ERROR"`) |
-| `message` | string | Human-readable description |
-| `endpoint` | string \| null | The JETNET endpoint that failed (for debugging) |
-| `rawResponsestatus` | string \| null | The raw `responsestatus` value from JETNET, if available |
-
-```json
-{
-  "code": "JETNET_ERROR",
-  "message": "JETNET returned an error on tail lookup",
-  "endpoint": "/api/Aircraft/getRegNumber/NXXXXX/{apiToken}",
-  "rawResponsestatus": "ERROR: INVALID SECURITY TOKEN"
-}
-```
-
----
-
-## Mapping Examples
-
-### 1. `getRegNumber` → AircraftCard
-
-The tail lookup endpoint returns an `aircraftresult` object with flat fields. Map it to an `AircraftCard`:
-
-```python
-raw = jetnet("GET", f"/api/Aircraft/getRegNumber/{reg}/{{apiToken}}")
-ac = raw["aircraftresult"]
-
-aircraft_card = {
-    "aircraftId":        ac["aircraftid"],
-    "regNbr":            ac["regnbr"],
-    "serialNbr":         ac.get("serialnbr", ""),
-    "make":              ac["make"],
-    "model":             ac["model"],
-    "year":              ac.get("yearmfr") or ac.get("yeardlv"),
-    "ownerCompanyId":    None,   # not available from this endpoint
-    "operatorCompanyId": None,   # not available from this endpoint
-}
-```
-
-> **Note:** `getRegNumber` does not return owner/operator company IDs directly. You must call `getRelationships` or inspect the `companyrelationships` array (if present) to fill those in.
-
-### 2. `getRelationships` → CompanyCard (owner + operator)
-
-The relationships endpoint returns a `relationships` array with nested `company` objects. Extract owner and operator:
-
-```python
-raw = jetnet("POST", "/api/Aircraft/getRelationships/{apiToken}", {
-    "aircraftid": aircraft_id,
-    "aclist": [], "modlist": [],
-    "actiondate": "", "showHistoricalAcRefs": False
-})
-
-owner = None
-operator = None
-
-for rel in raw.get("relationships", []):
-    card = {
-        "companyId":    rel.get("companyid") or rel.get("company", {}).get("companyid"),
-        "companyName":  rel.get("name") or rel.get("company", {}).get("name"),
-        "segment":      None,          # not returned by this endpoint
-        "location":     None,          # not returned by this endpoint
-        "primaryPhone": None,          # not returned by this endpoint
-    }
-    if rel.get("relationtype") == "Owner" and rel.get("relationseqno") == 1:
-        owner = card
-    elif rel.get("relationtype") == "Operator" and rel.get("relationseqno") == 1:
-        operator = card
-```
-
-> To fill in `segment`, `location`, and `primaryPhone`, make a follow-up call to `GET /api/Company/getCompany/{companyId}/{apiToken}`.
-
-### 3. `getBulkAircraftExport` → AircraftCard (with owner/operator pre-filled)
-
-The bulk export uses flat role-prefixed fields (`owr*`, `opr*`). You can build both `AircraftCard` and `CompanyCard` objects from a single row:
-
-```python
-raw = jetnet("POST", "/api/Aircraft/getBulkAircraftExportPaged/{apiToken}/100/1", {
-    "make": "GULFSTREAM", "aclist": [], "modlist": []
-})
-
-for row in raw.get("aircraft", []):
-    aircraft_card = {
-        "aircraftId":        row["aircraftid"],
-        "regNbr":            row["regnbr"],
-        "serialNbr":         row.get("sernbr", ""),
-        "make":              row["make"],
-        "model":             row["model"],
-        "year":              row.get("yearmfr") or row.get("yeardlv"),
-        "ownerCompanyId":    row.get("owrcompanyid"),
-        "operatorCompanyId": row.get("oprcompanyid"),
-    }
-
-    owner_card = {
-        "companyId":    row.get("owrcompanyid"),
-        "companyName":  row.get("owrcompanyname"),
-        "segment":      None,
-        "location":     None,
-        "primaryPhone": None,
-    } if row.get("owrcompanyid") else None
-
-    operator_card = {
-        "companyId":    row.get("oprcompanyid"),
-        "companyName":  row.get("oprcompanyname"),
-        "segment":      None,
-        "location":     None,
-        "primaryPhone": None,
-    } if row.get("oprcompanyid") else None
-```
-
----
-
-## Where People Go Wrong
-
-### 1. Treating HTTP 200 as success
-
-JETNET returns HTTP 200 for most responses — including errors. You **must** check the `responsestatus` field in every response body:
-
-```python
-result = r.json()
-status = result.get("responsestatus", "")
-if "ERROR" in status.upper():
-    raise ValueError(f"JETNET error: {status}")
-```
-
-If you skip this check, your app will silently render empty data or crash downstream when fields are missing.
-
-### 2. Assuming the same schema across endpoints
-
-The `companyrelationships` structure differs by endpoint — this is the single biggest source of mapping bugs:
-
-| Endpoint | Schema Style | Relation Field | How to get company name |
-|----------|-------------|----------------|------------------------|
-| `getRegNumber` | Flat | `companyrelation` | `companyname` (top-level) |
-| `getRelationships` | Nested | `relationtype` | `company.name` (nested object) |
-| `getBulkAircraftExport` | Role-prefixed | Field prefix (`owr*`, `opr*`) | `owrcompanyname`, `oprcompanyname` |
-
-If you copy mapping code from one endpoint and use it on another, fields will be `undefined` / `None`. Always check which endpoint you are mapping from.
-
-### 3. Confusing owner vs. operator
-
-Many aircraft have both an **owner** (the legal title holder) and an **operator** (the company that flies it). These are often different entities. When `relationseqno` > 1, there may be multiple owners or operators — always filter for `relationseqno == 1` to get the primary.
-
-### 4. Forgetting to enrich CompanyCard fields
-
-The `getRelationships` and `getBulkAircraftExport` endpoints return company ID and name but not segment, location, or phone. If your UI needs those fields, you need a follow-up call to `GET /api/Company/getCompany/{companyId}/{apiToken}` or `GET /api/Company/getIdentification/{companyId}/{apiToken}`.
-
-### 5. Hardcoding date strings
-
-Flight activity and history endpoints require `startdate` and `enddate` in `MM/DD/YYYY` format. Compute these dynamically at runtime:
-
-```python
-from datetime import datetime, timedelta
-start = (datetime.now() - timedelta(days=180)).strftime("%m/%d/%Y")
-end = datetime.now().strftime("%m/%d/%Y")
-```
-
-Never hardcode dates like `"01/01/2024"` — your queries will silently return stale or empty data as time passes.
-
-### 6. Swapping bearer token and API token
-
-- `bearerToken` goes in the **Authorization header**: `Authorization: Bearer {bearerToken}`
-- `apiToken` goes in the **URL path**: `/api/Aircraft/getRegNumber/N123AB/{apiToken}`
-
-If you swap them, you will get `INVALID SECURITY TOKEN` errors even though you just logged in successfully.

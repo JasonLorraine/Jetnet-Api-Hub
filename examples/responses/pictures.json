@@ -1,0 +1,47 @@
+{
+  "_comment": "getPictures -- aircraft images (pre-signed S3 URLs, ~1 hour expiry)",
+  "endpoint": "GET /api/Aircraft/getPictures/{aircraftid}/{apiToken}",
+  "tier": "A",
+  "request": {
+    "method": "GET",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getPictures/144322/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}"
+    }
+  },
+  "response": {
+    "responseid": "509902559",
+    "responsestatus": "SUCCESS",
+    "count": 3,
+    "pictures": [
+      {
+        "imageid": 745198,
+        "imagedate": "2022-08-11T12:56:06",
+        "description": "Exterior",
+        "extension": "jpg",
+        "pictureurl": "https://evo-assets-3wl.s3.us-west-2.amazonaws.com/pictures/aircraft/745198.jpg?X-Amz-Expires=3600&..."
+      },
+      {
+        "imageid": 745199,
+        "imagedate": "2022-08-11T12:58:22",
+        "description": "Interior",
+        "extension": "jpg",
+        "pictureurl": "https://evo-assets-3wl.s3.us-west-2.amazonaws.com/pictures/aircraft/745199.jpg?X-Amz-Expires=3600&..."
+      },
+      {
+        "imageid": 745200,
+        "imagedate": "2022-08-11T13:01:05",
+        "description": "Cockpit",
+        "extension": "jpg",
+        "pictureurl": "https://evo-assets-3wl.s3.us-west-2.amazonaws.com/pictures/aircraft/745200.jpg?X-Amz-Expires=3600&..."
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'pictures'",
+    "pictureurl is a pre-signed S3 URL -- expires after approximately 1 hour",
+    "fetch and display immediately -- do not cache the URL itself",
+    "description values seen: 'Exterior', 'Interior', 'Cockpit', 'Avionics'",
+    "requires aircraftid -- get it first from getRegNumber or getAircraftList"
+  ]
+}

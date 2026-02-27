@@ -1,37 +1,26 @@
-# JETNET API Prompts
+# JETNET Prompt Recipes
 
-Pre-built prompts for AI coding assistants (Cursor, Copilot, ChatGPT, Claude, etc.).
+Paste these into Cursor, GitHub Copilot Chat, or any AI coding assistant to scaffold
+working JETNET integrations fast. Each prompt is self-contained and produces runnable
+starter code.
+
+| File | Use case | Primary endpoint |
+|---|---|---|
+| `01_golden_path_tail_lookup_app.md` | Next.js tail-number lookup UI | getRegNumber |
+| `02_fbo_airport_activity_leads.md` | FBO ramp-to-lead enrichment | getRegNumber loop |
+| `03_fleet_watchlist_alerts.md` | Fleet change monitoring alerts | getBulkAircraftExportPaged |
+| `04_bulk_export_pipeline.md` | Hourly market intelligence feed | getBulkAircraftExportPaged |
 
 ## How to use
 
-1. Pick a prompt that matches your use case
-2. Copy the entire file contents
-3. Paste into your AI coding assistant as a new conversation
-4. Set your environment variables (`JETNET_EMAIL`, `JETNET_PASSWORD`, `JETNET_BASE_URL`)
-5. Let the AI build the app
+1. Open the prompt file.
+2. Copy the entire contents.
+3. Paste into Cursor Composer (Cmd+I), Copilot Chat, or Claude.
+4. Fill in the `[PLACEHOLDER]` values for your specific project.
+5. Iterate on the generated code.
 
-## Available prompts
+## Tips
 
-| File | Use case |
-|------|----------|
-| `01_golden_path_tail_lookup_app.md` | Enter a tail number, get a full aircraft profile with owner/operator and flight activity |
-| `02_fbo_airport_activity_leads.md` | Airport-based flight activity for FBO lead generation and ramp contact targeting |
-| `03_fleet_watchlist_alerts.md` | Monitor a fleet by model, alert on ownership changes |
-| `04_bulk_export_pipeline.md` | Bulk aircraft export with pagination and incremental sync |
-
-## Prompt structure
-
-Every prompt follows the same standard sections:
-
-- **App goal** — what the app does in one sentence
-- **UI screens** — what the user sees
-- **API workflow** — ordered sequence of JETNET API calls
-- **Response shaping contract** — normalized output shape for the frontend
-- **Auth/session rules** — must use session helpers + `/getAccountInfo` validation
-- **Error rules** — responsestatus handling, retry logic
-- **Definition of done** — acceptance criteria checklist
-- **Do not do** — common mistakes to avoid
-
-## Dependencies
-
-All prompts reference the session helpers in `src/jetnet/session.py` (Python) and `src/jetnet/session.js` (JavaScript). These handle login, token refresh, `/getAccountInfo` validation, and error normalization automatically.
+- These prompts reference `src/jetnet/session.py` and `src/jetnet/session.ts` -- make sure those files are in your project.
+- For Cursor: paste into Composer with your project open so Cursor can read the session helpers.
+- For standalone use: the prompts include the minimal auth pattern inline.

@@ -1,0 +1,55 @@
+{
+  "_comment": "getCondensedOwnerOperators -- current owner and operator snapshot per aircraft",
+  "endpoint": "POST /api/Aircraft/getCondensedOwnerOperators/{apiToken}",
+  "tier": "A",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getCondensedOwnerOperators/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "aclist": [128228],
+      "modlist": [],
+      "actiondate": ""
+    }
+  },
+  "response": {
+    "responseid": "336336033",
+    "responsestatus": "SUCCESS",
+    "count": 1,
+    "currentpage": 0,
+    "maxpages": 0,
+    "aircraftowneroperators": [
+      {
+        "acid": 119804,
+        "airframetype": "FixedWing",
+        "maketype": "Turboprop",
+        "make": "PILATUS",
+        "model": "PC-12/47",
+        "modelicao": "PC12",
+        "manufacturer": "Pilatus Aircraft, Ltd.",
+        "modelid": 1173,
+        "serialnbr": "800",
+        "regnbr": "N743SC",
+        "regexpiresdate": "1/31/2029 12:00:00 AM",
+        "status": "Not for Sale",
+        "asking": null,
+        "datepurchased": "2010-06-22T00:00:00",
+        "comp1id": 322790,
+        "comp1relation": "Owner",
+        "comp1agencytype": "Civilian",
+        "comp1businesstype": "End User",
+        "comp1name": "Example Owner Company"
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'aircraftowneroperators'",
+    "pass multiple aircraft in aclist for a batch lookup",
+    "comp1relation, comp2relation etc. for multiple relationship roles",
+    "actiondate filter: only return records that changed since that date (for incremental sync)",
+    "currentpage/maxpages = 0 when no additional pages"
+  ]
+}

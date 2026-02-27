@@ -1,0 +1,56 @@
+{
+  "_comment": "getBulkAircraftExportPaged -- full aircraft records with company data (always use paged)",
+  "endpoint": "POST /api/Aircraft/getBulkAircraftExportPaged/{apiToken}/{pagesize}/{page}",
+  "tier": "B",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getBulkAircraftExportPaged/{apiToken}/10/1",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "airframetype": "None",
+      "maketype": "None",
+      "make": "GULFSTREAM",
+      "forsale": "",
+      "lifecycle": "InOperation",
+      "actiondate": "01/08/2026",
+      "modlist": [],
+      "aclist": []
+    }
+  },
+  "response": {
+    "responseid": "351400252",
+    "responsestatus": "SUCCESS: AC Count: 1 Comp Count: 9 Cont Count: 9 Phone Count: 15",
+    "exportaircraftcount": 1,
+    "currentpage": 0,
+    "maxpages": 0,
+    "aircraftcount": 1,
+    "aircraft": [
+      {
+        "aircraftid": 211921,
+        "modelid": 1188,
+        "maketype": "BusinessJet",
+        "make": "CHALLENGER",
+        "model": "350",
+        "sernbr": "20564",
+        "regnbr": "N573FX",
+        "yeardelivered": 2015,
+        "yearmfr": 2015,
+        "forsale": "N",
+        "asking": "",
+        "status": "",
+        "maintained": "FAR Part 135",
+        "datepurchased": "20150616"
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'aircraft' (same as getAircraftList)",
+    "responsestatus includes record counts: 'SUCCESS: AC Count: N Comp Count: N Cont Count: N'",
+    "ALWAYS use the paged variant -- getBulkAircraftExport (non-paged) will timeout on large datasets",
+    "actiondate filter is critical for incremental sync -- only pull records changed since last run",
+    "forsale in this response is 'N'/'Y' string (different from getAircraftList which uses 'true'/'false')"
+  ]
+}

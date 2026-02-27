@@ -1,115 +1,103 @@
-# Prompt: Golden Path Tail Lookup App
+# Prompt 01: Golden Path Tail-Number Lookup App
 
-## App goal
+> Paste this into Cursor Composer or GitHub Copilot Chat.
+> Fill in the [PLACEHOLDER] values before pasting.
 
-Build a web app where a user enters an aircraft registration number (tail number) and gets back a full aircraft profile card showing identity, owner, operator, and recent flight activity.
+---
 
-## UI screens
+Build a Next.js 14 App Router page that lets a user type an aircraft tail number
+and see ownership and contact information from the JETNET API.
 
-1. **Search screen** — Single input field for tail number (e.g., `N123AB`), a submit button
-2. **Results screen** — Aircraft card displaying:
-   - Aircraft identity: registration, make, model, year, serial number
-   - Base airport (ICAO code and name)
-   - Photos (if available)
-   - Owner and operator company names
-   - Recent flight activity (last 6 months, up to 20 flights)
-3. **Error screen** — Clear error message if aircraft not found or API error occurs
+## Project context
 
-## API workflow
+- Framework: Next.js 14 with App Router and TypeScript
+- Styling: Tailwind CSS
+- JETNET base URL: https://customer.jetnetconnect.com
+- Auth: dual-token -- bearerToken in Authorization header, apiToken in URL path
+- Session helper: use `src/jetnet/session.ts` (already in this repo)
 
-Call these endpoints in this exact order:
+## What to build
 
-1. **Login** — `POST /api/Admin/APILogin` with `{ "emailAddress": "...", "password": "..." }`
-   - Store `bearerToken` and `apiToken` server-side
-2. **Tail lookup** — `GET /api/Aircraft/getRegNumber/{reg}/{apiToken}`
-   - Extract `aircraftid` from `aircraftresult` — this is required before any other call
-   - If `aircraftid` is missing, return "Aircraft not found"
-3. **Fan out in parallel** (all three at once):
-   - **Pictures** — `GET /api/Aircraft/getPictures/{aircraftid}/{apiToken}`
-   - **Relationships** — `POST /api/Aircraft/getRelationships/{apiToken}` with body `{ "aircraftid": ID, "aclist": [], "modlist": [], "actiondate": "", "showHistoricalAcRefs": false }`
-   - **Flight activity** — `POST /api/Aircraft/getFlightDataPaged/{apiToken}/100/1` with body `{ "aircraftid": ID, "startdate": "MM/DD/YYYY", "enddate": "MM/DD/YYYY", "origin": "", "destination": "", "aclist": [], "modlist": [], "exactMatchReg": true }`
-   - Compute `startdate` as 6 months ago and `enddate` as today — never hardcode dates
+### 1. Server action or API route: `app/api/aircraft/route.ts`
 
-## Response shaping contract
+- Accepts a POST with body `{ tailNumber: string }`
+- Calls `GET /api/Aircraft/getRegNumber/{tailNumber}/{apiToken}` with Bearer header
+- Returns the normalized `GoldenPathResult` shape (see `docs/response-shapes.md`)
+- Handles errors: invalid tail, no result, token expired
 
-Normalize all JETNET responses into this shape before sending to the frontend:
+### 2. UI page: `app/page.tsx`
 
+- Text input for tail number (placeholder: "N12345")
+- Submit button that calls the server action
+- Loading state while fetching
+- Result card showing:
+  - Aircraft: make, model, year, tail number, category size
+  - Owner: company name, city, state, contact name, title, phone, email
+  - Operator: company name if different from owner
+  - Base airport and ICAO code
+  - Market status badge (For Sale / Not For Sale)
+- Error state: "Tail number not found" or "API error"
+
+### 3. Environment variables
+
+Read credentials from:
+- `JETNET_EMAIL` -- emailAddress (CRITICAL: capital A in the API field name)
+- `JETNET_PASSWORD`
+
+### 4. JETNET response normalization
+
+The raw JETNET response has this structure:
 ```json
 {
-  "aircraft": {
-    "id": 211461,
-    "reg": "N123AB",
-    "serialNbr": "6789",
+  "responsestatus": "SUCCESS",
+  "aircraftresult": {
+    "regnbr": "N12345",
     "make": "GULFSTREAM",
-    "model": "G650",
-    "year": 2018
-  },
-  "base": {
-    "icao": "KTEB",
-    "airport": "Teterboro"
-  },
-  "photos": [
-    { "description": "Exterior", "date": "2022-08-11", "url": "https://..." }
-  ],
-  "owner": {
-    "companyId": 350427,
-    "companyName": "Example Owner LLC"
-  },
-  "operator": {
-    "companyId": 456,
-    "companyName": "Example Operator Inc."
-  },
-  "flights": [
-    { "date": "2026-02-10", "origin": "KTEB", "dest": "KPBI", "minutes": 165 }
-  ]
+    "model": "G550",
+    "companyrelationships": [
+      {
+        "companyrelation": "Owner",
+        "companyname": "Acme Aviation LLC",
+        "companycity": "Dallas",
+        "companystate": "Texas",
+        "contactfirstname": "John",
+        "contactlastname": "Smith",
+        "contacttitle": "CEO",
+        "contactemail": "john@acme.com",
+        "contactbestphone": "214-555-1234"
+      }
+    ]
+  }
 }
 ```
 
-- `owner` and `operator` may be `null` if not present in relationships
-- Filter relationships by `relationtype`: `"Owner"` and `"Operator"`
-- Photos `url` is a pre-signed S3 URL — display immediately, do not cache longer than 1 hour
-- Limit flights to 20 most recent
+Use `companyrelation` (not `relationtype`) to filter Owner vs Operator.
+Map flat prefixed fields (companyname, contactfirstname) to your UI -- do not nest.
 
-## Auth/session rules
+### 5. Error handling rules
 
-- Use the session helpers from `src/jetnet/session.py` (Python) or `src/jetnet/session.js` (JavaScript)
-- Call `ensureSession()` / `ensure_session()` before every API request — this validates the token via `GET /api/Utility/getAccountInfo/{apiToken}` and re-logs in automatically if the token is invalid
-- Use `jetnetRequest()` / `jetnet_request()` for all API calls — it handles auth headers, token insertion, and single retry on `INVALID SECURITY TOKEN`
-- Token TTL is 60 minutes; session helpers proactively refresh at 50 minutes
-- Store all credentials and tokens server-side only — never expose to the browser
+- HTTP 200 with `responsestatus` starting with "ERROR" or "INVALID" = application error
+- `responsestatus: "SUCCESS"` but empty `aircraftresult` = tail not found
+- Network timeout: show retry button
 
-## Error rules
+### 6. Auth/session rules
 
-- Always check `responsestatus` in every JETNET response — HTTP 200 does not mean success
-- If `responsestatus` contains `"ERROR"`, surface the message to the user
-- On `"ERROR: INVALID SECURITY TOKEN"`, re-login once and retry — do not loop
-- If the retry also fails, surface the error — do not retry again
-- Handle network errors and non-JSON responses gracefully
+- Token TTL is 60 minutes; proactively refresh at 50 minutes
+- Validate tokens via `GET /api/Admin/getAccountInfo/{apiToken}` before long workflows
+- On `INVALID SECURITY TOKEN`: re-login once and retry -- do not loop
+- Store all credentials server-side -- never expose to the browser
 
-## Definition of done
+## Output files
 
-- [ ] User can enter a tail number and see a full aircraft profile
-- [ ] Login uses `emailAddress` (capital A) in the request body
-- [ ] `bearerToken` is sent in `Authorization: Bearer` header on every request
-- [ ] `apiToken` is inserted into URL paths (not headers or body)
-- [ ] `aircraftid` is resolved from `getRegNumber` before any other endpoint is called
-- [ ] Pictures, relationships, and flights load in parallel after tail lookup
-- [ ] Response is normalized to the contract shape above
-- [ ] `responsestatus` is checked on every response
-- [ ] Token is validated via `/getAccountInfo` using session helpers
-- [ ] Dates are computed dynamically (6-month window for flights)
-- [ ] Error states are displayed to the user
-- [ ] Credentials are never sent to the client
+Produce:
+1. `app/api/aircraft/route.ts`
+2. `app/page.tsx`
+3. `lib/jetnet.ts` (thin JETNET fetch wrapper using session.ts)
+4. `.env.example` with `JETNET_EMAIL=` and `JETNET_PASSWORD=` stubs
 
-## Do not do
+## Constraints
 
-- Do not hardcode dates — compute `startdate` and `enddate` at runtime
-- Do not send raw JETNET responses to the frontend — always normalize
-- Do not cache `pictureurl` longer than 1 hour (pre-signed S3 URLs expire)
-- Do not send tokens or credentials to the browser/mobile client
-- Do not retry on auth failure more than once
-- Do not call `getRelationships`, `getPictures`, or `getFlightDataPaged` without first resolving `aircraftid` from `getRegNumber`
-- Do not use `emailaddress` (lowercase a) — the field is `emailAddress`
-- Do not put `apiToken` in headers or request body — it goes in the URL path only
-- Do not ignore `responsestatus` — HTTP 200 can still be an error
-- Do not swap `bearerToken` and `apiToken` — bearer goes in the header, apiToken goes in the URL path
+- No `localStorage` or browser storage
+- All JETNET calls server-side only (never expose bearerToken to the browser)
+- TypeScript strict mode
+- Tailwind only for styling (no other CSS libraries)

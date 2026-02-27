@@ -1,0 +1,83 @@
+{
+  "_comment": "getRegNumber -- look up an aircraft by registration number (tail)",
+  "endpoint": "GET /api/Aircraft/getRegNumber/{reg}/{apiToken}",
+  "tier": "A",
+  "request": {
+    "method": "GET",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getRegNumber/N131SF/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}"
+    }
+  },
+  "response": {
+    "responseid": "555666286",
+    "responsestatus": "SUCCESS",
+    "aircraftresult": {
+      "aircraftid": 144322,
+      "modelid": 773,
+      "airframetype": "FixedWing",
+      "maketype": "Turboprop",
+      "make": "BEECH",
+      "model": "1900C-1",
+      "icaotype": "B190",
+      "serialnbr": "UC-131",
+      "regnbr": "N131SF",
+      "yearmfr": 1990,
+      "yeardlv": 1990,
+      "weightclass": "Medium",
+      "categorysize": "Commercial Turboprop Airliner",
+      "baseicao": "KOMA",
+      "baseairport": "Eppley Airfield",
+      "ownership": "Wholly Owned",
+      "usage": "Cargo",
+      "maintained": "FAR Part 135",
+      "companyrelationships": [
+        {
+          "companyid": 4425,
+          "parentcompanyid": 0,
+          "companyrelation": "Owner",
+          "companyname": "Suburban Air Freight, Inc.",
+          "companyisoperator": null,
+          "companyagencytype": "Civilian",
+          "companybusinesstype": "Cargo Carrier",
+          "companyaddress1": "4010 Amelia Earhart Plaza",
+          "companycity": "Omaha",
+          "companystate": "Nebraska",
+          "companystateabbr": "NE",
+          "companypostcode": "68110",
+          "companycountry": "United States",
+          "contactid": 747133,
+          "contactsirname": "Mr.",
+          "contactfirstname": "Michael",
+          "contactmiddleinitial": "E",
+          "contactlastname": "Dancy",
+          "contacttitle": "CEO",
+          "contactbestphone": "402-344-4100"
+        },
+        {
+          "companyid": 4425,
+          "companyrelation": "Operator",
+          "companyname": "Suburban Air Freight, Inc.",
+          "companybusinesstype": "Charter Company",
+          "contactid": 5612,
+          "contactfirstname": "Jay",
+          "contactlastname": "Barber",
+          "contacttitle": "Director of Operations"
+        },
+        {
+          "companyid": 515857,
+          "companyrelation": "Certificate Holder",
+          "companyname": "Alpine Air Express, Inc",
+          "companybusinesstype": "Cargo Carrier",
+          "contactid": 0
+        }
+      ]
+    }
+  },
+  "notes": [
+    "response key is 'aircraftresult' (singular object, not an array)",
+    "companyrelationships here is FLAT -- fields prefixed: companyname, contactfirstname, etc.",
+    "relation field is 'companyrelation' (not 'relationtype' -- that's a different structure)",
+    "aircraftid from this response is the join key for all subsequent calls"
+  ]
+}

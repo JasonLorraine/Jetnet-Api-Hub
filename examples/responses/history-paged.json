@@ -1,0 +1,96 @@
+{
+  "_comment": "getHistoryListPaged -- ownership history with pagination",
+  "endpoint": "POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pagesize}/{page}",
+  "tier": "B",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getHistoryListPaged/{apiToken}/100/1",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "aircraftid": 0,
+      "airframetype": "None",
+      "maketype": "None",
+      "make": "GULFSTREAM",
+      "modelid": 0,
+      "modlist": [],
+      "aclist": [],
+      "companyid": 0,
+      "isnewaircraft": "Ignore",
+      "allrelationships": true,
+      "transtype": ["None"],
+      "startdate": "01/01/2025",
+      "enddate": "04/01/2025"
+    }
+  },
+  "response": {
+    "responseid": "555668000",
+    "responsestatus": "SUCCESS: PAGE [ 1 of 428 ]",
+    "count": 100,
+    "currentpage": 1,
+    "maxpages": 428,
+    "history": [
+      {
+        "aircraftid": 248543,
+        "transid": 31887288,
+        "modelid": 666,
+        "actiondate": "2026-02-20T07:13:43",
+        "make": "GULFSTREAM",
+        "model": "G280",
+        "sernbr": "2323",
+        "regnbr": "4X-",
+        "transtype": "Full Sale - Manufacturer to Internal",
+        "transdate": "2026-01-28T00:00:00",
+        "description": "Sold from Israel Aerospace Industries, Ltd. to Gulfstream Aerospace, LLC",
+        "forsale": false,
+        "marketstatus": "Not for Sale",
+        "companyrelationships": [
+          {
+            "companyid": 111,
+            "name": "Israel Aerospace Industries, Ltd.",
+            "relationtype": "Seller",
+            "relationseqno": 1,
+            "contactid": 235731,
+            "isoperator": "N",
+            "businesstype": "Manufacturer",
+            "company": {
+              "companyid": 111,
+              "name": "Israel Aerospace Industries, Ltd.",
+              "city": "Tel Aviv",
+              "country": "Israel"
+            },
+            "contact": {
+              "contactid": 235731,
+              "firstname": "Gadi",
+              "lastname": "Cohen",
+              "title": "VP & GM"
+            }
+          },
+          {
+            "companyid": 429695,
+            "name": "Gulfstream Aerospace, LLC",
+            "relationtype": "Purchaser",
+            "relationseqno": 10,
+            "contactid": null,
+            "isoperator": "N",
+            "businesstype": "Manufacturer",
+            "company": { "companyid": 429695, "name": "Gulfstream Aerospace, LLC" },
+            "contact": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'history' (not 'historylist' or 'transactions')",
+    "currentpage is 1-based -- first page = 1",
+    "loop: while page <= data['maxpages']",
+    "responsestatus format: 'SUCCESS: PAGE [ 1 of 428 ]' -- use maxpages not this string",
+    "companyrelationships here is NESTED (company/contact sub-objects), relation field is 'relationtype'",
+    "allrelationships: true = full nested company+contact objects; false = IDs only (lighter)",
+    "transtype: ['None'] = all transaction types; [] behaves differently",
+    "forsale in history records is a JSON boolean (not a string like in getAircraftList)"
+  ]
+}

@@ -1,110 +1,123 @@
-# Prompt: FBO Airport Activity Leads
+# Prompt 02: FBO Airport Activity Lead Enrichment
 
-## App goal
+> Paste this into Cursor Composer or GitHub Copilot Chat.
+> Fill in the [PLACEHOLDER] values before pasting.
 
-Build a lead generation tool for FBOs (Fixed Base Operators) that shows which aircraft are flying into or out of a specific airport, identifies the operating companies and decision-maker contacts, and produces a prospect list for outreach.
+---
 
-## UI screens
+Build a Python script that takes a list of aircraft tail numbers observed at an FBO
+and enriches each one with owner and contact information from the JETNET API,
+outputting a CSV ready for CRM import.
 
-1. **Airport input screen** — Input field for airport ICAO code (e.g., `KTEB`), direction toggle (arrivals / departures / both), date range selector (default: last 90 days)
-2. **Activity feed** — Table of flights showing: tail number, make/model, origin, destination, date, operator name
-3. **Lead detail** — Click a row to see: aircraft card, owner/operator info, contact names and titles
-4. **Export** — Button to download the prospect list as CSV
+## Project context
 
-## API workflow
+- Language: Python 3.11+
+- JETNET base URL: https://customer.jetnetconnect.com
+- Session helper: use `src/jetnet/session.py` (already in this repo)
+- Output: CSV file for CRM import
 
-Call these endpoints in this exact order:
+## What to build
 
-1. **Login** — `POST /api/Admin/APILogin` with `{ "emailAddress": "...", "password": "..." }`
-   - Store `bearerToken` and `apiToken` server-side
-2. **Flight activity search** — `POST /api/Aircraft/getFlightDataPaged/{apiToken}/100/1`
-   - For arrivals: set `destination` to the ICAO code, leave `origin` empty
-   - For departures: set `origin` to the ICAO code, leave `destination` empty
-   - Body: `{ "origin": "KTEB", "destination": "", "startdate": "MM/DD/YYYY", "enddate": "MM/DD/YYYY", "aclist": [], "modlist": [], "exactMatchReg": true }`
-   - Page through all results using `maxpages` — treat `maxpages: 0` as 1 page (JETNET quirk)
-3. **Deduplicate aircraft** — Collect unique `aircraftid` values from flight results
-4. **Bulk relationships** — `POST /api/Aircraft/getRelationships/{apiToken}` with `aclist` containing all unique aircraft IDs
-   - Body: `{ "aclist": [id1, id2, ...], "modlist": [], "actiondate": "", "showHistoricalAcRefs": false }`
-   - This returns all owner/operator/contact info in one call
-5. **Contact enrichment (optional)** — For high-priority leads, call `GET /api/Company/getContacts/{companyid}/{apiToken}` to get full contact details including titles, email, phone
+### Script: `fbo_lead_enrichment.py`
 
-## Response shaping contract
+#### Input
 
-Normalize into this shape per lead:
-
-```json
-{
-  "aircraft": {
-    "id": 211461,
-    "reg": "N123AB",
-    "make": "GULFSTREAM",
-    "model": "G650",
-    "year": 2018
-  },
-  "flights": [
-    { "date": "2026-02-10", "origin": "KTEB", "dest": "KPBI", "minutes": 165 }
-  ],
-  "operator": {
-    "companyId": 456,
-    "companyName": "Flight Ops Inc."
-  },
-  "owner": {
-    "companyId": 350427,
-    "companyName": "Example Owner LLC"
-  },
-  "contacts": [
-    { "name": "Jane Doe", "title": "Chief Pilot", "email": "jane@example.com", "phone": "555-0100" }
-  ],
-  "flightCount": 12
-}
+A text file or hardcoded list of tail numbers, one per line:
+```
+N12345
+N67890
+N11111
 ```
 
-- Sort leads by `flightCount` descending — most active operators first
-- Filter contacts for relevant titles: Chief Pilot, Director of Aviation, Scheduler, Dispatcher, Director of Flight Operations
-- `owner` and `operator` may be `null`
-- Relationships use the nested schema (`relationtype`, `company {}`, `contact {}`)
+Read from `TAIL_FILE` env var or a default `tails.txt` in the same directory.
 
-## Auth/session rules
+#### JETNET call per tail
 
-- Use the session helpers from `src/jetnet/session.py` (Python) or `src/jetnet/session.js` (JavaScript)
-- Call `ensureSession()` / `ensure_session()` before every API request — this validates the token via `GET /api/Utility/getAccountInfo/{apiToken}` and re-logs in automatically if the token is invalid
-- Use `jetnetRequest()` / `jetnet_request()` for all API calls — it handles auth headers, token insertion, and single retry on `INVALID SECURITY TOKEN`
-- Token TTL is 60 minutes; session helpers proactively refresh at 50 minutes
-- Store all credentials and tokens server-side only
+For each tail number, call:
+```
+GET /api/Aircraft/getRegNumber/{tailNumber}/{apiToken}
+```
 
-## Error rules
+With header: `Authorization: Bearer {bearerToken}`
 
-- Always check `responsestatus` in every JETNET response — HTTP 200 does not mean success
-- If `responsestatus` contains `"ERROR"`, surface the message to the user
-- On `"ERROR: INVALID SECURITY TOKEN"`, re-login once and retry — do not loop
-- If the retry also fails, surface the error
-- When paging, if `maxpages` is 0, treat as 1 page (single-page result) — do not skip
+#### Response parsing
 
-## Definition of done
+The response key is `aircraftresult` (not `aircraft`).
+`companyrelationships` uses a FLAT schema with these field names:
+- `companyrelation` -- "Owner", "Operator", "Chief Pilot", etc.
+- `companyname`, `companycity`, `companystate`, `companycountry`
+- `contactfirstname`, `contactlastname`, `contacttitle`
+- `contactemail`, `contactbestphone`, `contactofficephone`, `contactmobilephone`
+- `baseicao`, `baseairport` -- aircraft home base
 
-- [ ] User can enter an airport ICAO code and see flight activity
-- [ ] Arrivals and departures can be filtered independently
-- [ ] Aircraft are deduplicated before calling `getRelationships`
-- [ ] Bulk `getRelationships` is used (pass `aclist`) instead of looping per aircraft
-- [ ] Leads are sorted by flight count (most active operators first)
-- [ ] Contacts are filtered for decision-maker titles
-- [ ] Login uses `emailAddress` (capital A)
-- [ ] `bearerToken` in header, `apiToken` in URL path
-- [ ] `responsestatus` is checked on every response
-- [ ] Token is validated via `/getAccountInfo` using session helpers
-- [ ] Dates are computed dynamically (default 90-day window)
-- [ ] Pagination handles `maxpages: 0` correctly
-- [ ] CSV export works
+#### Target contacts
 
-## Do not do
+Filter `companyrelationships` where `contacttitle` contains any of:
+- "Chief Pilot"
+- "Director of Aviation"
+- "Scheduler"
+- "Dispatcher"
 
-- Do not loop `getRegNumber` per tail for bulk lookups — use `getRelationships` with `aclist` instead
-- Do not hardcode dates — compute at runtime using `MM/DD/YYYY` format
-- Do not send raw JETNET responses to the frontend — normalize first
-- Do not send tokens or credentials to the browser
-- Do not retry on auth failure more than once
-- Do not ignore `responsestatus` — HTTP 200 can still be an error
-- Do not use `emailaddress` (lowercase a) — the field is `emailAddress`
-- Do not put `apiToken` in headers or request body — it goes in the URL path only
-- Do not swap `bearerToken` and `apiToken`
-- Do not confuse the flat schema from `getRegNumber` with the nested schema from `getRelationships` — they use different field names (`companyrelation` vs `relationtype`)
+If no such title found, fall back to the Owner's primary contact.
+
+#### Output CSV columns
+
+```
+tail_number, make, model, year, category_size,
+base_icao, base_airport, base_country,
+company_name, company_city, company_state, company_country,
+contact_first, contact_last, contact_title,
+contact_email, contact_best_phone, contact_office_phone, contact_mobile,
+for_sale, market_status,
+jetnet_url
+```
+
+The `jetnet_url` for manual research:
+`http://www.jetnetevolution.com/DisplayAircraftDetail.aspx?acid={aircraftid}`
+
+#### Rate limiting
+
+Sleep 0.5 seconds between API calls. Print progress: `[5/20] N12345 -- OK`.
+
+#### Error handling
+
+- Tail not found: write a row with `make=NOT_FOUND`, skip contact fields
+- JETNET error: log warning, write row with `make=ERROR:{status}`
+- Network error: retry once, then skip
+
+#### Auth/session rules
+
+- Token TTL is 60 minutes; proactively refresh at 50 minutes
+- Validate tokens via `GET /api/Admin/getAccountInfo/{apiToken}` before long workflows
+- On `INVALID SECURITY TOKEN`: re-login once and retry -- do not loop
+- `emailAddress` has a capital A -- this is the single most common auth mistake
+
+#### Environment variables
+
+```
+JETNET_EMAIL      # emailAddress -- CRITICAL: capital A in the JSON field
+JETNET_PASSWORD
+JETNET_BASE_URL   # optional, default: https://customer.jetnetconnect.com
+TAIL_FILE         # optional, default: tails.txt
+OUTPUT_FILE       # optional, default: fbo_leads.csv
+```
+
+## Auth pattern
+
+```python
+# Use session helper (recommended)
+from src.jetnet.session import login, ensure_session, jetnet_request
+
+session = login()
+session = ensure_session(session)
+result = jetnet_request("GET", "/api/Aircraft/getRegNumber/N12345/{apiToken}", session)
+```
+
+## Output
+
+Produce one file: `fbo_lead_enrichment.py`
+
+Print a summary at the end:
+```
+Done. 18/20 tails enriched. 2 not found. Output: fbo_leads.csv
+```

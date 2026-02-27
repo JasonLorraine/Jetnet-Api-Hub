@@ -1,151 +1,170 @@
-# Prompt: Bulk Export Pipeline
+# Prompt 04: Bulk Export Market Intelligence Pipeline
 
-## App goal
+> Paste this into Cursor Composer or GitHub Copilot Chat.
+> Fill in the [PLACEHOLDER] values before pasting.
 
-Build a data pipeline that exports the full fleet of aircraft for a given segment (by model, airframe type, or geography), handles pagination correctly, supports incremental sync via `actiondate`, and outputs structured data for analytics or CRM ingestion.
+---
 
-## UI screens
+Build a Python FastAPI service that runs an hourly JETNET bulk export poll,
+stores aircraft records in a SQLite database, and exposes a REST API for querying
+market dynamics -- for-sale counts, ownership turnover, and fleet composition by
+model category.
 
-1. **Pipeline config** — Select filters: airframe type (FixedWing, Rotorcraft), make type (BusinessJet, Turboprop), model IDs, lifecycle (InOperation, ForSale), base country/state. Set output format (JSON, CSV). Toggle sub-arrays: maintenance, equipment, exterior, interior.
-2. **Run status** — Progress bar showing: current page / total pages, records exported so far, elapsed time, estimated time remaining
-3. **Results summary** — Total records exported, file download link, timestamp of run, any errors encountered
-4. **Sync history** — Log of past runs with timestamps, record counts, and `actiondate` used for each run
+## Project context
 
-## API workflow
+- Language: Python 3.11+
+- Framework: FastAPI + uvicorn
+- Database: SQLite via SQLAlchemy (swap for Postgres by changing the connection string)
+- JETNET base URL: https://customer.jetnetconnect.com
+- Paginator: use `scripts/paginate.py` (`get_bulk_export`)
+- Session helper: use `src/jetnet/session.py`
 
-Call these endpoints in this exact order:
+## What to build
 
-1. **Login** — `POST /api/Admin/APILogin` with `{ "emailAddress": "...", "password": "..." }`
-   - Store `bearerToken` and `apiToken` server-side
-2. **Bulk export (paged)** — `POST /api/Aircraft/getBulkAircraftExportPaged/{apiToken}/{pagesize}/{page}`
-   - Start with page 1, pagesize 100
-   - Body:
-     ```json
-     {
-       "airframetype": "FixedWing",
-       "maketype": "BusinessJet",
-       "lifecycle": "InOperation",
-       "actiondate": "",
-       "enddate": "",
-       "exactMatchReg": false,
-       "showHistoricalAcRefs": false,
-       "showAwaitingDocsCompanies": false,
-       "showMaintenance": false,
-       "showAdditionalEquip": false,
-       "showExterior": false,
-       "showInterior": false,
-       "aclist": [],
-       "modlist": []
-     }
-     ```
-   - Response key is `aircraft` (array)
-   - Use `maxpages` to determine total pages — treat `maxpages: 0` as 1 page
-   - Page through all results: increment `page` from 1 to `max(maxpages, 1)`
-3. **Incremental sync (subsequent runs)** — Same endpoint with `actiondate` set to last run timestamp
-   - `actiondate`: `"MM/DD/YYYY HH:MM:SS"` of last successful run
-   - `enddate`: current datetime in same format
-   - Only records changed since `actiondate` are returned
-   - Store last run timestamp after each successful export for the next run
+### Files
 
-## Response shaping contract
+```
+main.py             -- FastAPI app + scheduler
+db.py               -- SQLAlchemy models + session
+jetnet_poll.py      -- JETNET bulk export polling logic
+```
 
-Each exported aircraft record should be normalized to:
+### Database schema: `aircraft` table
 
-```json
+```sql
+CREATE TABLE aircraft (
+    aircraft_id     INTEGER PRIMARY KEY,
+    model_id        INTEGER,
+    tail_number     TEXT,
+    serial_number   TEXT,
+    make            TEXT,
+    model           TEXT,
+    year_mfr        INTEGER,
+    year_delivered  INTEGER,
+    make_type       TEXT,
+    for_sale        TEXT,           -- 'Y' | 'N' | ''
+    asking_price    TEXT,
+    market_status   TEXT,
+    lifecycle       TEXT,
+    owner_company   TEXT,
+    owner_city      TEXT,
+    owner_state     TEXT,
+    owner_country   TEXT,
+    operator_company TEXT,
+    est_aftt        INTEGER,
+    est_cycles      INTEGER,
+    last_action_date TEXT,          -- from JETNET actiondate
+    last_polled_at  TEXT            -- ISO datetime this row was last updated
+);
+```
+
+### Polling logic: `jetnet_poll.py`
+
+#### Hourly incremental poll
+
+```python
+def poll_bulk_export(session, db, last_run_dt: datetime) -> int:
+    """
+    Fetch all BusinessJet aircraft records changed since last_run_dt.
+    Upsert into the database. Return count of records processed.
+    """
+```
+
+POST body to `getBulkAircraftExportPaged`:
+```python
 {
-  "aircraft": {
-    "id": 211461,
-    "reg": "N123AB",
-    "serialNbr": "6789",
-    "make": "GULFSTREAM",
-    "model": "G650",
-    "year": 2018,
-    "lifecycle": "In Operation",
-    "baseIcao": "KTEB",
-    "baseAirport": "Teterboro",
-    "baseCountry": "US",
-    "baseState": "NJ"
-  },
-  "owner": {
-    "companyId": 350427,
-    "companyName": "Example Owner LLC",
-    "contactName": "John Doe",
-    "contactTitle": "Director of Aviation",
-    "contactEmail": "john@example.com",
-    "contactPhone": "555-0100"
-  },
-  "operator": {
-    "companyId": 456,
-    "companyName": "Flight Ops Inc.",
-    "contactName": "Jane Smith",
-    "contactTitle": "Chief Pilot",
-    "contactEmail": "jane@flightops.com",
-    "contactPhone": "555-0200"
-  },
-  "forSale": false,
-  "askingPrice": null,
-  "datePurchased": "2020-03-15",
-  "airframeHours": 4500
+    "airframetype": "None",
+    "maketype": "BusinessJet",
+    "lifecycle": "InOperation",
+    "actiondate": last_run_dt.strftime("%m/%d/%Y %H:%M:%S"),
+    "enddate": now.strftime("%m/%d/%Y %H:%M:%S"),
+    "exactMatchReg": False,
+    "showHistoricalAcRefs": False,
+    "showAwaitingDocsCompanies": False,
+    "showMaintenance": False,
+    "showAdditionalEquip": False,
+    "showExterior": False,
+    "showInterior": False,
 }
 ```
 
-- `getBulkAircraftExport` uses flat prefixed relationship fields — map them:
-  - `owr*` fields → `owner` object (`owrcompanyname`, `owrfname`, `owrlname`, `owrtitle`, `owremail`, `owrphone1`)
-  - `opr*` fields → `operator` object
-  - `chp*` fields → chief pilot info
-- `forsale` in this endpoint is `"Y"` / `"N"` / `""` — not `"true"`/`"false"`
-- `datepurchased` is `YYYYMMDD` format — convert to ISO date
-- `estaftt` or `aftt` = airframe total time (hours)
+IMPORTANT: `actiondate` and `enddate` MUST include time (`HH:MM:SS`) for hourly polling.
+`maxpages: 0` means all results fit in one page -- not an error.
 
-## Auth/session rules
+#### Flat schema parsing
 
-- Use the session helpers from `src/jetnet/session.py` (Python) or `src/jetnet/session.js` (JavaScript)
-- Call `ensureSession()` / `ensure_session()` before every API request — this validates the token via `GET /api/Utility/getAccountInfo/{apiToken}` and re-logs in automatically if the token is invalid
-- Use `jetnetRequest()` / `jetnet_request()` for all API calls — it handles auth headers, token insertion, and single retry on `INVALID SECURITY TOKEN`
-- Token TTL is 60 minutes; session helpers proactively refresh at 50 minutes
-- For long-running exports that span many pages, session helpers handle automatic token renewal mid-export — do not implement your own refresh loop
-- Store all credentials and tokens server-side only
+The bulk export uses prefixed flat fields for relationships:
+- `owrcompanyname`, `owrcity`, `owrstate`, `owrcountry` -- owner
+- `oprcompanyname` -- operator
+- `forsale` -- "Y" / "N" string (not boolean like other endpoints)
+- `asking` -- asking price string ("Inquire", "$4,500,000", etc.)
+- `status` -- market status string
 
-## Error rules
+#### Initial full load
 
-- Always check `responsestatus` in every JETNET response — HTTP 200 does not mean success
-- If `responsestatus` contains `"ERROR"`, log the error and surface it
-- On `"ERROR: INVALID SECURITY TOKEN"`, re-login once and retry — do not loop
-- If the retry also fails, surface the error
-- When paging: `maxpages: 0` means all results fit in one page — treat as 1 page, do not exit early
-- The `responsestatus` on success contains summary counts: `"SUCCESS: Ac Count: 12 Comp Count: 28 ..."` — parse these for validation
-- If a page fails mid-export, log the page number and allow resuming from that page
+On first run (no `last_polled_at` in DB), fetch the full fleet with no date filter:
+omit `actiondate` and `enddate`, or set `actiondate` to `"01/01/2000 00:00:00"`.
 
-## Definition of done
+### FastAPI endpoints: `main.py`
 
-- [ ] User can configure filters and run a bulk export
-- [ ] All pages are fetched — pagination handles `maxpages: 0` correctly
-- [ ] Incremental sync uses `actiondate` with full datetime format (`MM/DD/YYYY HH:MM:SS`)
-- [ ] Last run timestamp is stored and used as `actiondate` for next run
-- [ ] Flat prefixed relationship fields are mapped to normalized objects
-- [ ] `forsale` values `"Y"`/`"N"` are converted to boolean
-- [ ] `datepurchased` `YYYYMMDD` format is converted to ISO date
-- [ ] Output is available as JSON and/or CSV
-- [ ] Progress is shown during export
-- [ ] Login uses `emailAddress` (capital A)
-- [ ] `bearerToken` in header, `apiToken` in URL path
-- [ ] `responsestatus` is checked on every response
-- [ ] Token is validated via `/getAccountInfo` using session helpers
-- [ ] `show*` flags default to false to minimize payload size
+```
+GET /health
+    Returns: { "status": "ok", "last_poll": ISO_DATETIME, "aircraft_count": N }
 
-## Do not do
+GET /market/summary
+    Returns: {
+        "for_sale_count": N,
+        "not_for_sale_count": N,
+        "unknown_count": N,
+        "by_make": { "GULFSTREAM": N, "CITATION": N, ... }
+    }
 
-- Do not fetch all pages without checking `maxpages` — but also do not skip when `maxpages` is 0
-- Do not hardcode dates — compute at runtime, store last run time for incremental sync
-- Do not enable `show*` flags unless the user explicitly requests those sub-arrays — they increase payload size significantly
-- Do not send raw JETNET responses to the frontend — normalize the flat prefixed schema
-- Do not send tokens or credentials to the browser
-- Do not retry on auth failure more than once
-- Do not ignore `responsestatus` — HTTP 200 can still be an error
-- Do not use `emailaddress` (lowercase a) — the field is `emailAddress`
-- Do not put `apiToken` in headers or request body — it goes in the URL path only
-- Do not swap `bearerToken` and `apiToken`
-- Do not confuse `forsale` formats — `getBulkAircraftExport` uses `"Y"`/`"N"`, while `getAircraftList` uses `"true"`/`"false"`
-- Do not assume `datepurchased` is in `MM/DD/YYYY` format — in bulk export it is `YYYYMMDD`
-- Do not implement your own token refresh loop — use the session helpers which call `/getAccountInfo` for validation
-- Do not pull the entire fleet every run when only changes are needed — use `actiondate` for incremental sync
+GET /aircraft?tail=N12345
+    Returns: single aircraft row as JSON
+
+GET /aircraft?for_sale=true&make=GULFSTREAM
+    Returns: filtered list (limit 100)
+
+GET /market/trends?days=30
+    Returns: for-sale count per day for the last N days
+             (requires tracking historical for_sale changes)
+```
+
+### Auth/session rules
+
+- Token TTL is 60 minutes; proactively refresh at 50 minutes
+- Validate tokens via `GET /api/Admin/getAccountInfo/{apiToken}` before long workflows
+- On `INVALID SECURITY TOKEN`: re-login once and retry -- do not loop
+- `emailAddress` has a capital A
+
+### Environment variables
+
+```
+JETNET_EMAIL
+JETNET_PASSWORD
+JETNET_BASE_URL     # optional
+DATABASE_URL        # optional, default: sqlite:///./jetnet.db
+POLL_INTERVAL_HOURS # optional, default: 1
+MAKETYPE_FILTER     # optional, default: BusinessJet
+```
+
+## Output
+
+Produce all three files: `main.py`, `db.py`, `jetnet_poll.py`
+
+Also produce `requirements.txt`:
+```
+fastapi
+uvicorn
+sqlalchemy
+apscheduler
+requests
+python-dotenv
+```
+
+And `.env.example`:
+```
+JETNET_EMAIL=you@example.com
+JETNET_PASSWORD=yourpassword
+DATABASE_URL=sqlite:///./jetnet.db
+```

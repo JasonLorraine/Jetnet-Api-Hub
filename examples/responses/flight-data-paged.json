@@ -1,0 +1,70 @@
+{
+  "_comment": "getFlightDataPaged -- flight records for an aircraft or model segment",
+  "endpoint": "POST /api/Aircraft/getFlightDataPaged/{apiToken}/{pagesize}/{page}",
+  "tier": "A/B",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getFlightDataPaged/{apiToken}/100/1",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "aircraftid": 204177,
+      "airframetype": "None",
+      "sernbr": "",
+      "regnbr": "",
+      "maketype": "None",
+      "modelid": 0,
+      "make": "",
+      "origin": "",
+      "destination": "",
+      "startdate": "09/01/2025",
+      "enddate": "02/26/2026",
+      "aclist": [],
+      "modlist": [],
+      "exactMatchReg": true
+    }
+  },
+  "response": {
+    "responseid": "289649426",
+    "responsestatus": "SUCCESS: PAGE [ 1 of 3 ]",
+    "count": 100,
+    "currentpage": 1,
+    "maxpages": 3,
+    "flightdata": [
+      {
+        "make": "FALCON",
+        "model": "2000S",
+        "maketype": "BusinessJet",
+        "modelmfr": "DASSAULT",
+        "categorysize": "Large Jet",
+        "modelicao": "F2TH",
+        "modelid": 1149,
+        "yearmfr": 2013,
+        "sernbr": "2000S-711",
+        "regnbr": "N491N",
+        "usage": "Business",
+        "maintained": "FAR Part 91",
+        "aircraftid": 204177,
+        "countryofregistration": "United States",
+        "flightdate": "2025-12-01T13:15:00",
+        "flighttime": 202,
+        "distance": 1706,
+        "estfuelburn": 942.7,
+        "fuelburnrate": 280,
+        "estCO2emissions": 19890.3,
+        "flightid": "202512011677034819",
+        "origin_date": "2025-12-01T00:00:00"
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'flightdata' (not 'flights' or 'flightrecords')",
+    "paged -- use maxpages for loop control",
+    "flighttime is in minutes",
+    "distance is in nautical miles",
+    "filter by origin or destination ICAO code to find traffic at a specific airport",
+    "compute startdate/enddate dynamically -- do not hardcode dates"
+  ]
+}

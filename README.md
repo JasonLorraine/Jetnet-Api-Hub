@@ -105,7 +105,7 @@ That's it. You're connected.
 
 For production apps, use the session helpers instead of managing tokens manually:
 - **Python:** [`src/jetnet/session.py`](src/jetnet/session.py)
-- **JavaScript:** [`src/jetnet/session.js`](src/jetnet/session.js)
+- **TypeScript:** [`src/jetnet/session.ts`](src/jetnet/session.ts)
 
 ## Token Validation Strategy
 
@@ -142,7 +142,7 @@ jetnet-api-docs/
 │
 ├── src/jetnet/                         ← Session helpers (auto-refresh, validation)
 │   ├── session.py                      ← Python session module
-│   └── session.js                      ← JavaScript session module
+│   └── session.ts                      ← TypeScript session module
 │
 ├── docs/                               ← Core documentation
 │   ├── authentication.md               ← Login, tokens, refresh, retry
@@ -163,25 +163,16 @@ jetnet-api-docs/
 │   ├── 03_fleet_watchlist_alerts.md
 │   └── 04_bulk_export_pipeline.md
 │
+├── evals/                             ← AI eval test cases
+│   └── evals.json
+│
 ├── examples/                           ← Complete runnable examples
 │   ├── python/                         ← Python examples (requests + Flask)
-│   │   ├── 01_authentication.py
-│   │   ├── 02_tail_lookup.py
-│   │   ├── 03_fleet_search.py
-│   │   ├── 04_ownership.py
-│   │   ├── 05_flight_activity.py
-│   │   ├── 06_valuation.py
-│   │   ├── 07_bulk_export.py
-│   │   └── 08_golden_path_server.py
-│   └── javascript/                     ← JavaScript examples (fetch + Express)
-│       ├── 01_authentication.js
-│       ├── 02_tail_lookup.js
-│       ├── 03_fleet_search.js
-│       ├── 04_ownership.js
-│       ├── 05_flight_activity.js
-│       ├── 06_valuation.js
-│       ├── 07_bulk_export.js
-│       └── 08_golden_path_server.js
+│   │   ├── 01_authentication.py ... 08_golden_path_server.py
+│   ├── javascript/                     ← JavaScript examples (fetch + Express)
+│   │   ├── 01_authentication.js ... 08_golden_path_server.js
+│   └── responses/                     ← Known-good JSON response examples (16 files)
+│       ├── tail-lookup.json, relationships-single.json, bulk-export-paged.json, ...
 │
 ├── snippets/                           ← Copy-paste quick reference
 │   ├── fleet.md                        ← Fleet search snippets
@@ -318,9 +309,9 @@ Production-ready session modules that handle login, token refresh, and validatio
 | Module | Language | Features |
 |--------|----------|----------|
 | [`src/jetnet/session.py`](src/jetnet/session.py) | Python | `login()`, `ensure_session()`, `jetnet_request()`, `normalize_error()` |
-| [`src/jetnet/session.js`](src/jetnet/session.js) | JavaScript | `createSession()`, `ensureSession()`, `jetnetRequest()`, `normalizeError()` |
+| [`src/jetnet/session.ts`](src/jetnet/session.ts) | TypeScript | `login()`, `ensureSession()`, `jetnetRequest()`, `normalizeError()` |
 
-Both modules validate tokens via `/getAccountInfo`, proactively refresh at 50 minutes, and auto re-login once on `INVALID SECURITY TOKEN`.
+Both modules validate tokens via `/api/Admin/getAccountInfo`, proactively refresh at 50 minutes, and auto re-login once on `INVALID SECURITY TOKEN`.
 
 ---
 

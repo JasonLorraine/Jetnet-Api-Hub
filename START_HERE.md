@@ -16,7 +16,7 @@ New to the JETNET API? Pick your path and get running in minutes.
 2. Response gives you two tokens: `bearerToken` and `apiToken`
 3. Every call after login: `bearerToken` in the `Authorization` header, `apiToken` in the URL path
 4. Tokens expire after 60 minutes
-5. Validate your session with `/api/Utility/getAccountInfo/{apiToken}` before long workflows
+5. Validate your session with `/api/Admin/getAccountInfo/{apiToken}` before long workflows
 6. On `INVALID SECURITY TOKEN`: re-login once and retry. Never loop.
 
 ## HTTP 200 Does Not Mean Success
@@ -75,9 +75,9 @@ You want to enrich contacts, generate leads, or monitor ownership changes.
 We provide production-ready session modules that handle login, token refresh, and validation automatically:
 
 - **Python:** [`src/jetnet/session.py`](src/jetnet/session.py)
-- **JavaScript:** [`src/jetnet/session.js`](src/jetnet/session.js)
+- **TypeScript:** [`src/jetnet/session.ts`](src/jetnet/session.ts)
 
-These use `/getAccountInfo` as a lightweight health check to validate your token before long workflows, and auto re-login once if the token has expired.
+These use `/api/Admin/getAccountInfo` as a lightweight health check to validate your token before long workflows, and auto re-login once if the token has expired.
 
 ---
 

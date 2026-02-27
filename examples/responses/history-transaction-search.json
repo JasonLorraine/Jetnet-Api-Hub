@@ -1,0 +1,121 @@
+{
+  "_comment": "getHistoryListPaged -- find all Citation CJ3+ transactions (full sales and leases, preowned only, no internal) between 8/22/2025 and 2/18/2026. Use case: broker or analyst researching comparable sales activity for a model segment.",
+  "endpoint": "POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pagesize}/{page}",
+  "tier": "B",
+  "request": {
+    "make": "",
+    "modelid": 0,
+    "modlist": [1194],
+    "transtype": ["FullSale", "Lease"],
+    "startdate": "08/22/2025",
+    "enddate": "02/18/2026",
+    "isinternaltrans": "No",
+    "isnewaircraft": "No",
+    "allrelationships": true,
+    "aclist": []
+  },
+  "response": {
+    "responseid": "556111434",
+    "responsestatus": "SUCCESS",
+    "count": 38,
+    "currentpage": 0,
+    "maxpages": 0,
+    "history": [
+      {
+        "aircraftid": 246204,
+        "transid": 31305852,
+        "modelid": 1194,
+        "actiondate": "2025-11-11T15:30:41",
+        "pageurl": "http://www.jetnetevolution.com/DisplayAircraftDetail.aspx?acid=246204&jid=31305852",
+        "make": "CITATION",
+        "model": "CJ3+",
+        "yearmfr": 2024,
+        "yeardlv": 2025,
+        "maketype": "BusinessJet",
+        "weightclass": "Light",
+        "categorysize": "Light Jet",
+        "sernbr": "525B-0739",
+        "regnbr": "F-HVLE",
+        "transtype": "Full Sale - Retail to Unidentified",
+        "transdate": "2025-08-25T00:00:00",
+        "translastactiondate": "2025-09-04T15:09:33",
+        "description": "Sold from AMW Aero to Awaiting Documentation",
+        "customernote": "",
+        "internaltrans": false,
+        "newac": "preowned",
+        "usage": "Charter",
+        "transretail": true,
+        "soldprice": null,
+        "askingprice": null,
+        "listdate": "2025-04-10T00:00:00",
+        "purchasedate": "2025-01-16T00:00:00",
+        "estaftt": 76,
+        "estcycles": 17,
+        "basecountry": "France",
+        "basecontinent": "Europe",
+        "lifecycle": "InOperation",
+        "forsale": true,
+        "marketstatus": "For Sale",
+        "companyrelationships": [
+          {
+            "companyid": 422540,
+            "name": "AMW Aero",
+            "relationtype": "Seller",
+            "relationseqno": 1,
+            "contactid": 606048,
+            "ownerpercent": null,
+            "fractionexpiresdate": null,
+            "isoperator": "N",
+            "businesstype": "End User",
+            "company": {
+              "companyid": 422540,
+              "name": "AMW Aero",
+              "address1": "11 Route d Archigny",
+              "city": "Sainte-Radegonde",
+              "country": "France",
+              "email": "Sales02@acimetechnology.fr",
+              "office": "33-5-4901-8580"
+            },
+            "contact": {
+              "contactid": 606048,
+              "firstname": "Herve",
+              "lastname": "Mouly",
+              "title": "Manager",
+              "email": "herve@amwaero.com",
+              "office": "33-6-8585-2876",
+              "mobile": "66-815-83-2799"
+            }
+          },
+          {
+            "companyid": 422540,
+            "name": "AMW Aero",
+            "relationtype": "Operator",
+            "relationseqno": 2,
+            "contactid": 606048,
+            "isoperator": "N",
+            "businesstype": "End User",
+            "company": { "companyid": 422540, "name": "AMW Aero" },
+            "contact": { "contactid": 606048, "firstname": "Herve", "lastname": "Mouly" }
+          }
+        ]
+      }
+    ]
+  },
+  "notes": [
+    "transtype request values are CATEGORIES, not exact strings -- 'FullSale' matches 'Full Sale - Retail to Retail', 'Full Sale - Retail to Unidentified', etc.",
+    "Known transtype category values: 'None' (all), 'FullSale', 'Lease', 'InternalSale', 'Management', 'Insurance', 'Repossession', 'Registration'",
+    "isinternaltrans and isnewaircraft are tristate strings: 'Yes', 'No', 'Ignore'",
+    "maxpages: 0 / currentpage: 0 when results fit in one call -- NOT an error (same quirk as getBulkAircraftExport)",
+    "transtype in the RESPONSE is a full descriptive string: 'Full Sale - Retail to Retail', 'Full Sale - Retail to Leasing Company', 'Lease - Leasing Company to Retail'",
+    "companyrelationships uses NESTED schema (company:{}, contact:{}) with relationtype -- same as getRelationships",
+    "relationtype values in history: 'Seller', 'Purchaser', 'Operator', \"Seller's Broker\", \"Purchaser's Broker\"",
+    "soldprice and askingprice are often null -- JETNET reports prices where available but many deals are confidential",
+    "transretail: true = arm's length retail transaction (use for comparable sales analysis)",
+    "internaltrans: false = not an intra-company transfer (filter this for real market transactions)",
+    "newac: 'preowned' or 'new' -- maps to isnewaircraft filter in the request",
+    "transdate = actual transaction date (ISO); actiondate = when JETNET last updated this record (ISO)",
+    "pageurl links to JETNET Evolution web app detail page -- useful for customer-facing deep links",
+    "listdate = when aircraft was listed for sale; purchasedate = when it entered current owner's fleet",
+    "Use allrelationships: true to get all parties (Seller, Purchaser, Brokers) in one response"
+  ]
+}

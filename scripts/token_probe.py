@@ -1,106 +1,143 @@
 """
-token_probe.py -- Measure JETNET API token TTL by polling /getAccountInfo.
+token_probe.py -- JETNET token lifetime measurement script
 
-Logs in via src/jetnet/session.py, then polls /getAccountInfo every 60 seconds
-until the token is rejected. Records the observed TTL and saves the result
-to .cache/token_probe.json.
+Logs in and polls /getAccountInfo every N seconds until the token expires,
+measuring the actual token TTL so you can tune your refresh window.
 
 Usage:
     python scripts/token_probe.py
 
 Environment variables:
-    JETNET_EMAIL     -- JETNET account email
-    JETNET_PASSWORD  -- JETNET account password
-    JETNET_BASE_URL  -- (optional) API base URL
+    JETNET_EMAIL     -- emailAddress (capital A)
+    JETNET_PASSWORD  -- account password
+    JETNET_BASE_URL  -- default: https://customer.jetnetconnect.com
+    PROBE_INTERVAL   -- seconds between polls, default 60
+
+Output:
+    [HH:MM:SS] age=0:00:00 -- OK (acc: yourname@example.com)
+    [HH:MM:SS] age=0:05:00 -- OK
+    ...
+    [HH:MM:SS] age=0:57:00 -- EXPIRED after 0:57:00
+    Token lifetime: 0:57:00
+
+Typical results: JETNET tokens last ~60 minutes from issuance.
+Recommended refresh: 50 minutes (TOKEN_TTL = 3000 in session.py).
 """
 
-import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
-from pathlib import Path
+import datetime
+import requests
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from src.jetnet.session import (
-    login,
-    get_account_info,
-    JetnetApiError,
-    JetnetAuthError,
-    DEFAULT_BASE_URL,
-)
-
-POLL_INTERVAL_SECONDS = 60
-CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
+BASE_URL   = os.getenv("JETNET_BASE_URL", "https://customer.jetnetconnect.com")
+EMAIL      = os.getenv("JETNET_EMAIL", "")
+PASSWORD   = os.getenv("JETNET_PASSWORD", "")
+INTERVAL   = int(os.getenv("PROBE_INTERVAL", "60"))
 
 
-def run_probe(email: str, password: str, base_url: str = DEFAULT_BASE_URL) -> dict:
-    """Login and poll /getAccountInfo until the token expires.
+def ts() -> str:
+    """Current local time as HH:MM:SS."""
+    return datetime.datetime.now().strftime("%H:%M:%S")
 
-    Returns:
-        A dict with probe results including observed TTL.
+
+def elapsed(start: float) -> str:
+    """Format seconds elapsed as H:MM:SS."""
+    secs = int(time.time() - start)
+    h, rem = divmod(secs, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}"
+
+
+def login() -> tuple[str, str]:
     """
-    print(f"Logging in as {email} ...")
-    session = login(email, password, base_url)
-    login_time = time.time()
-    print(f"Login successful. apiToken starts with: {session.api_token[:8]}...")
-    print(f"Polling /getAccountInfo every {POLL_INTERVAL_SECONDS}s until failure.\n")
+    Log in and return (bearerToken, apiToken).
 
-    poll_count = 0
-
-    while True:
-        time.sleep(POLL_INTERVAL_SECONDS)
-        poll_count += 1
-        elapsed = time.time() - login_time
-        elapsed_label = _format_duration(elapsed)
-
-        try:
-            get_account_info(session)
-            print(f"  Poll #{poll_count:>4d}  |  {elapsed_label}  |  OK")
-        except (JetnetAuthError, JetnetApiError, Exception) as exc:
-            print(f"  Poll #{poll_count:>4d}  |  {elapsed_label}  |  FAILED: {exc}")
-            failure_time = time.time()
-            ttl_seconds = failure_time - login_time
-            ttl_label = _format_duration(ttl_seconds)
-            print(f"\nObserved token TTL: {ttl_label}")
-            return {
-                "login_at": datetime.fromtimestamp(login_time, tz=timezone.utc).isoformat(),
-                "failure_at": datetime.fromtimestamp(failure_time, tz=timezone.utc).isoformat(),
-                "ttl_seconds": round(ttl_seconds, 2),
-                "ttl_human": ttl_label,
-                "polls": poll_count,
-                "poll_interval_seconds": POLL_INTERVAL_SECONDS,
-            }
+    CRITICAL: field is 'emailAddress' with capital A.
+    """
+    url = f"{BASE_URL}/api/Admin/APILogin"
+    r = requests.post(
+        url,
+        json={"emailAddress": EMAIL, "password": PASSWORD},
+        timeout=30,
+    )
+    r.raise_for_status()
+    data = r.json()
+    status = data.get("responsestatus", "")
+    if "ERROR" in status.upper() or "INVALID" in status.upper():
+        raise RuntimeError(f"Login failed: {status}")
+    bearer = data.get("bearerToken", "")
+    token  = data.get("apiToken", "")
+    if not bearer or not token:
+        raise RuntimeError(f"Login returned no tokens: {data}")
+    return bearer, token
 
 
-def _format_duration(seconds: float) -> str:
-    """Format a duration in seconds as '12m 34s'."""
-    m, s = divmod(int(seconds), 60)
-    return f"{m}m {s:02d}s"
-
-
-def save_result(result: dict) -> Path:
-    """Write probe results to .cache/token_probe.json."""
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = CACHE_DIR / "token_probe.json"
-    with open(out_path, "w") as f:
-        json.dump(result, f, indent=2)
-    print(f"Result saved to {out_path}")
-    return out_path
+def probe(bearer: str, token: str) -> dict:
+    """
+    Call /getAccountInfo and return the parsed response.
+    Raises on HTTP error or JETNET application error.
+    """
+    url = f"{BASE_URL}/api/Admin/getAccountInfo/{token}"
+    r = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {bearer}"},
+        timeout=30,
+    )
+    r.raise_for_status()
+    data = r.json()
+    status = data.get("responsestatus", "")
+    if "ERROR" in status.upper() or "INVALID" in status.upper():
+        raise RuntimeError(f"Token invalid: {status}")
+    return data
 
 
 def main():
-    email = os.getenv("JETNET_EMAIL", "")
-    password = os.getenv("JETNET_PASSWORD", "")
-    base_url = os.getenv("JETNET_BASE_URL", DEFAULT_BASE_URL)
-
-    if not email or not password:
-        print("Error: Set JETNET_EMAIL and JETNET_PASSWORD environment variables.")
+    if not EMAIL or not PASSWORD:
+        print("ERROR: Set JETNET_EMAIL and JETNET_PASSWORD environment variables.")
         sys.exit(1)
 
-    result = run_probe(email, password, base_url)
-    save_result(result)
+    print(f"Logging in as {EMAIL} ...")
+    bearer, token = login()
+    start = time.time()
+    print(f"[{ts()}] Login OK -- probing every {INTERVAL}s\n")
+
+    consecutive_errors = 0
+
+    while True:
+        try:
+            info = probe(bearer, token)
+            account = info.get("emailaddress") or info.get("emailAddress") or "?"
+            print(f"[{ts()}] age={elapsed(start)} -- OK (acc: {account})")
+            consecutive_errors = 0
+
+        except RuntimeError as e:
+            age = elapsed(start)
+            print(f"[{ts()}] age={age} -- EXPIRED: {e}")
+            print(f"\nToken lifetime: {age}")
+            print(
+                "Recommendation: set TOKEN_TTL in session.py to "
+                f"{int(time.time() - start) - INTERVAL}s "
+                f"(i.e. {(time.time() - start - INTERVAL) / 60:.0f}m) "
+                "to refresh before expiry."
+            )
+            sys.exit(0)
+
+        except requests.HTTPError as e:
+            consecutive_errors += 1
+            print(f"[{ts()}] age={elapsed(start)} -- HTTP error: {e} (attempt {consecutive_errors})")
+            if consecutive_errors >= 3:
+                print("3 consecutive HTTP errors -- aborting.")
+                sys.exit(2)
+
+        except requests.RequestException as e:
+            consecutive_errors += 1
+            print(f"[{ts()}] age={elapsed(start)} -- Network error: {e} (attempt {consecutive_errors})")
+            if consecutive_errors >= 3:
+                print("3 consecutive network errors -- aborting.")
+                sys.exit(2)
+
+        time.sleep(INTERVAL)
 
 
 if __name__ == "__main__":

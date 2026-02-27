@@ -159,20 +159,19 @@ session = ensure_session(session)
 result = jetnet_request("GET", "/api/Aircraft/getRegNumber/N1KE/{apiToken}", session)
 ```
 
-**JavaScript** — [`src/jetnet/session.js`](../src/jetnet/session.js)
+**TypeScript** — [`src/jetnet/session.ts`](../src/jetnet/session.ts)
 
-```javascript
-import { createSession, login, ensureSession, jetnetRequest } from "../../src/jetnet/session.js";
+```typescript
+import { login, ensureSession, jetnetRequest } from "../../src/jetnet/session";
 
-let session = createSession(email, password, baseUrl);
-session = await login(session);
+let session = await login(email, password, baseUrl);
 session = await ensureSession(session);
-const result = await jetnetRequest("GET", `/api/Aircraft/getRegNumber/N1KE/{apiToken}`, session);
+const result = await jetnetRequest("GET", "/api/Aircraft/getRegNumber/N1KE/{apiToken}", session);
 ```
 
 ## Token Validation with /getAccountInfo
 
-`GET /api/Utility/getAccountInfo/{apiToken}` is a lightweight endpoint that returns your account details. Use it as a health check before long workflows:
+`GET /api/Admin/getAccountInfo/{apiToken}` is a lightweight endpoint that returns your account details. Use it as a health check before long workflows:
 
 - Cheap call — no data payload, fast response
 - If it returns a valid response, your token is good

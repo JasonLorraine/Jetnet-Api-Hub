@@ -1,0 +1,83 @@
+{
+  "_comment": "getRelationships -- Pattern A: single aircraft lookup (Tier A, Golden Path)",
+  "endpoint": "POST /api/Aircraft/getRelationships/{apiToken}",
+  "tier": "A",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getRelationships/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "aircraftid": 211461,
+      "aclist": [],
+      "modlist": [],
+      "actiondate": "",
+      "showHistoricalAcRefs": false
+    }
+  },
+  "response": {
+    "responseid": "555667001",
+    "responsestatus": "SUCCESS",
+    "aircraftcount": 1,
+    "count": 3,
+    "relationships": [
+      {
+        "aircraftid": 211461,
+        "regnbr": "N123AB",
+        "companyid": 350427,
+        "name": "Example Owner LLC",
+        "relationtype": "Owner",
+        "relationseqno": 1,
+        "contactid": 524808,
+        "ownerpercent": null,
+        "fractionpurchasedate": null,
+        "fractionexpiresdate": null,
+        "isoperator": "N",
+        "businesstype": "End User",
+        "company": {
+          "companyid": 350427,
+          "parentcompanyid": 0,
+          "active": true,
+          "name": "Example Owner LLC",
+          "city": "Dallas",
+          "state": "Texas",
+          "country": "United States"
+        },
+        "contact": {
+          "contactid": 524808,
+          "firstname": "John",
+          "lastname": "Smith",
+          "title": "CEO"
+        }
+      },
+      {
+        "aircraftid": 211461,
+        "regnbr": "N123AB",
+        "companyid": 456789,
+        "name": "Example Charter Inc.",
+        "relationtype": "Operator",
+        "relationseqno": 1,
+        "contactid": 678901,
+        "isoperator": "Y",
+        "businesstype": "Charter Company",
+        "company": {
+          "companyid": 456789,
+          "name": "Example Charter Inc.",
+          "city": "Teterboro",
+          "state": "New Jersey",
+          "country": "United States"
+        },
+        "contact": null
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'relationships' (array)",
+    "structure is NESTED -- company and contact are sub-objects",
+    "relation field is 'relationtype' (not 'companyrelation' -- that's getRegNumber)",
+    "aircraftcount = distinct aircraft; count = total relationship records",
+    "one aircraft can have multiple entries: Owner, Operator, Chief Pilot, etc."
+  ]
+}

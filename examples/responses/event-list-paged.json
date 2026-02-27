@@ -1,0 +1,50 @@
+{
+  "_comment": "getEventListPaged -- aircraft market events (sales, accidents, for-sale listings, etc.)",
+  "endpoint": "POST /api/Aircraft/getEventListPaged/{apiToken}/{pagesize}/{page}",
+  "tier": "B",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getEventListPaged/{apiToken}/100/1",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "evtype": ["Off Market Due To Sale"],
+      "evcategory": ["transaction"],
+      "startdate": "01/25/2026",
+      "enddate": "02/02/2026",
+      "aclist": [],
+      "modlist": []
+    }
+  },
+  "response": {
+    "responseid": "340652808",
+    "responsestatus": "SUCCESS",
+    "count": 961,
+    "currentpage": 0,
+    "maxpages": 0,
+    "events": [
+      {
+        "aircraftid": 232064,
+        "make": "ROBINSON",
+        "model": "R44 RAVEN II",
+        "sernbr": "14343",
+        "regnbr": "VH-NSX",
+        "yearmfr": 2019,
+        "yeardlv": 2019,
+        "date": "2025-04-14T05:48:33",
+        "subject": "New Owner",
+        "description": "AirX, Inc."
+      }
+    ]
+  },
+  "notes": [
+    "response key is 'events'",
+    "WARNING: evtype and evcategory enum values are strict",
+    "sending unrecognized enum values returns an ERROR inside responsestatus even when HTTP is 200",
+    "always call getEventCategories and getEventTypes first to populate valid enum values",
+    "use [] for evtype and evcategory to get all event types (safer than guessing enum strings)",
+    "leave aclist and modlist empty to search across all aircraft"
+  ]
+}

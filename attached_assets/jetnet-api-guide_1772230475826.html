@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JETNET API Developer Guide</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #0a1628;
+      --blue:   #1a56db;
+      --blue-l: #3b82f6;
+      --sky:    #e0f0ff;
+      --gold:   #f59e0b;
+      --green:  #10b981;
+      --red:    #ef4444;
+      --gray-50:  #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-600: #4b5563;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--gray-800);
+      background: var(--gray-50);
+      line-height: 1.6;
+    }
+
+    /* ---- NAV ---- */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--navy);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem;
+      height: 60px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+    .nav-logo {
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--gold); }
+    .nav-links { display: flex; gap: 1.6rem; list-style: none; }
+    .nav-links a {
+      color: rgba(255,255,255,.75);
+      text-decoration: none;
+      font-size: .875rem;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: #fff; }
+
+    /* ---- HERO ---- */
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, #0d2550 60%, #132d6b 100%);
+      color: #fff;
+      padding: 5rem 2rem 4rem;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 999px;
+      padding: .3rem 1rem;
+      font-size: .8rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      line-height: 1.15;
+      max-width: 780px;
+      margin: 0 auto 1.25rem;
+    }
+    .hero h1 span { color: var(--gold); }
+    .hero p {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,.75);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+    }
+    .hero-ctas { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: .7rem 1.6rem;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+    .btn-primary { background: var(--blue-l); color: #fff; }
+    .btn-outline { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.4); }
+
+    /* ---- PATHS ---- */
+    .paths {
+      background: #fff;
+      padding: 4rem 2rem;
+    }
+    .section-label {
+      text-align: center;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--blue-l);
+      font-weight: 700;
+      margin-bottom: .6rem;
+    }
+    .section-title {
+      text-align: center;
+      font-size: clamp(1.5rem, 3vw, 2.2rem);
+      font-weight: 800;
+      color: var(--gray-900);
+      margin-bottom: .75rem;
+    }
+    .section-subtitle {
+      text-align: center;
+      color: var(--gray-600);
+      max-width: 560px;
+      margin: 0 auto 3rem;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 14px;
+      padding: 1.75rem;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .card:hover { box-shadow: 0 8px 30px rgba(0,0,0,.09); transform: translateY(-3px); }
+    .card-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .card-icon-blue   { background: #dbeafe; }
+    .card-icon-green  { background: #d1fae5; }
+    .card-icon-purple { background: #ede9fe; }
+    .card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: .4rem; color: var(--gray-900); }
+    .card p  { font-size: .9rem; color: var(--gray-600); margin-bottom: 1rem; }
+    .card-tag {
+      display: inline-block;
+      background: var(--sky);
+      color: var(--blue);
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .2rem .6rem;
+      border-radius: 4px;
+      margin-right: .35rem;
+      margin-bottom: .35rem;
+    }
+
+    /* ---- AUTH SECTION ---- */
+    .auth-section {
+      background: var(--navy);
+      color: #fff;
+      padding: 4rem 2rem;
+    }
+    .auth-section .section-title { color: #fff; }
+    .auth-section .section-subtitle { color: rgba(255,255,255,.65); }
+    .auth-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    @media (max-width: 720px) { .auth-grid { grid-template-columns: 1fr; } }
+    .auth-steps { display: flex; flex-direction: column; gap: 1.25rem; }
+    .auth-step {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 32px; height: 32px;
+      background: var(--blue-l);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-content h4 { font-size: 1rem; font-weight: 700; margin-bottom: .25rem; }
+    .step-content p  { font-size: .875rem; color: rgba(255,255,255,.65); }
+    .step-content code {
+      background: rgba(255,255,255,.12);
+      padding: .1rem .35rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: .85rem;
+    }
+
+    /* ---- CODE BLOCKS ---- */
+    .code-wrap {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0d1117;
+    }
+    .code-header {
+      background: #161b22;
+      padding: .6rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: .75rem;
+      color: rgba(255,255,255,.5);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .code-header .dots { display: flex; gap: 6px; }
+    .code-header .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .dot-red   { background: #ff5f57; }
+    .dot-yellow{ background: #febc2e; }
+    .dot-green { background: #28c840; }
+    pre { margin: 0 !important; }
+    pre code.hljs { padding: 1.25rem 1.5rem !important; font-size: .82rem !important; }
+
+    /* ---- ENDPOINTS ---- */
+    .endpoints-section {
+      background: #fff;
+      padding: 4rem 2rem;
+    }
+    .endpoint-group { max-width: 1000px; margin: 0 auto 2.5rem; }
+    .endpoint-group-title {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--gray-400);
+      font-weight: 700;
+      margin-bottom: .75rem;
+    }
+    .endpoint-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .875rem;
+    }
+    .endpoint-table th {
+      text-align: left;
+      padding: .6rem 1rem;
+      background: var(--gray-100);
+      color: var(--gray-600);
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .endpoint-table td {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--gray-200);
+      color: var(--gray-800);
+    }
+    .endpoint-table tr:last-child td { border-bottom: none; }
+    .method {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      font-size: .75rem;
+      font-weight: 700;
+      font-family: monospace;
+    }
+    .method-get  { background: #d1fae5; color: #065f46; }
+    .method-post { background: #dbeafe; color: #1e40af; }
+    .tier-a { background: #fef3c7; color: #92400e; }
+    .tier-b { background: #ede9fe; color: #5b21b6; }
+    code.inline {
+      background: var(--gray-100);
+      padding: .15rem .4rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: .85em;
+      color: var(--blue);
+    }
+
+    /* ---- GUARDRAILS ---- */
+    .guardrails-section {
+      background: var(--gray-50);
+      padding: 4rem 2rem;
+    }
+    .guardrails-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .guardrail {
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-left: 4px solid;
+      border-radius: 0 10px 10px 0;
+      padding: 1.1rem 1.25rem;
+    }
+    .guardrail-warn  { border-left-color: var(--gold); }
+    .guardrail-error { border-left-color: var(--red); }
+    .guardrail-ok    { border-left-color: var(--green); }
+    .guardrail h4 {
+      font-size: .9rem;
+      font-weight: 700;
+      margin-bottom: .35rem;
+      color: var(--gray-900);
+    }
+    .guardrail p {
+      font-size: .83rem;
+      color: var(--gray-600);
+      line-height: 1.5;
+    }
+    .guardrail code {
+      background: var(--gray-100);
+      padding: .1rem .35rem;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: .82em;
+    }
+
+    /* ---- EXAMPLES SECTION ---- */
+    .examples-section {
+      background: var(--navy);
+      padding: 4rem 2rem;
+    }
+    .examples-section .section-title { color: #fff; }
+    .examples-section .section-subtitle { color: rgba(255,255,255,.6); }
+    .tabs {
+      display: flex;
+      gap: .5rem;
+      max-width: 900px;
+      margin: 0 auto 1.25rem;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: .45rem 1rem;
+      border-radius: 6px;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,.2);
+      color: rgba(255,255,255,.6);
+      background: transparent;
+      transition: all .15s;
+    }
+    .tab.active { background: var(--blue-l); border-color: var(--blue-l); color: #fff; }
+    .tab-content { display: none; max-width: 900px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    /* ---- FOOTER ---- */
+    footer {
+      background: #060e1e;
+      color: rgba(255,255,255,.5);
+      text-align: center;
+      padding: 2.5rem 1rem;
+      font-size: .875rem;
+    }
+    footer a { color: rgba(255,255,255,.7); text-decoration: none; }
+    footer a:hover { color: #fff; }
+
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 600px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 3rem 1.25rem 2.5rem; }
+      .paths, .endpoints-section, .guardrails-section, .examples-section { padding: 2.5rem 1.25rem; }
+      .auth-section { padding: 2.5rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">JETNET <span>API</span></a>
+  <ul class="nav-links">
+    <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="#endpoints">Endpoints</a></li>
+    <li><a href="#examples">Examples</a></li>
+    <li><a href="#guardrails">Guardrails</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">Jetnet Connect API</div>
+  <h1>Build with <span>Business Aviation</span> Data</h1>
+  <p>Everything you need to integrate JETNET ownership, fleet, market, and transaction data into your app, CRM, or pipeline.</p>
+  <div class="hero-ctas">
+    <a href="#quickstart" class="btn btn-primary">Get Started</a>
+    <a href="#endpoints" class="btn btn-outline">Endpoint Reference</a>
+  </div>
+</section>
+
+<!-- THREE PATHS -->
+<section class="paths" id="paths">
+  <div class="section-label">Choose Your Path</div>
+  <h2 class="section-title">What are you building?</h2>
+  <p class="section-subtitle">JETNET data powers three core integration patterns. Pick the one that fits your use case.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon card-icon-blue">✈️</div>
+      <h3>Path A — Demo UI</h3>
+      <p>A web app where users type a tail number and see owner, operator, contact info, and market status in real time.</p>
+      <span class="card-tag">getRegNumber</span>
+      <span class="card-tag">Next.js</span>
+      <span class="card-tag">FastAPI</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-green">📊</div>
+      <h3>Path B — Bulk Pipeline</h3>
+      <p>Hourly fleet sync, nightly database refresh, or a market intelligence feed tracking thousands of aircraft for changes.</p>
+      <span class="card-tag">getBulkAircraftExport</span>
+      <span class="card-tag">Paged</span>
+      <span class="card-tag">Async</span>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-purple">🎯</div>
+      <h3>Path C — CRM Enrichment</h3>
+      <p>Take a tail number list or airport activity feed and enrich your CRM with decision-maker contacts and fleet data.</p>
+      <span class="card-tag">getRegNumber</span>
+      <span class="card-tag">getRelationships</span>
+      <span class="card-tag">getHistoryList</span>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START / AUTH -->
+<section class="auth-section" id="quickstart">
+  <div class="section-label">Authentication</div>
+  <h2 class="section-title">Two tokens, every call</h2>
+  <p class="section-subtitle">Log in once to get a <strong>bearerToken</strong> and an <strong>apiToken</strong>. Every subsequent request needs both.</p>
+
+  <div class="auth-grid">
+    <div class="auth-steps">
+      <div class="auth-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>POST to /APILogin</h4>
+          <p>Send your credentials. The field is <code>emailAddress</code> — capital A required. Sending <code>email</code> or <code>emailaddress</code> returns HTTP 200 with an error body.</p>
+        </div>
+      </div>
+      <div class="auth-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Store both tokens</h4>
+          <p>You get back <code>bearerToken</code> and <code>apiToken</code>. Tokens are valid for ~8 hours. Refresh proactively after 7 hours.</p>
+        </div>
+      </div>
+      <div class="auth-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Use both on every request</h4>
+          <p><code>bearerToken</code> goes in the <code>Authorization: Bearer</code> header. <code>apiToken</code> goes in the URL path — never in headers or body.</p>
+        </div>
+      </div>
+      <div class="auth-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Check responsestatus</h4>
+          <p>HTTP 200 does not mean success. Always check <code>responsestatus</code> for strings starting with <code>ERROR</code> or <code>INVALID</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+        <span>Python — login.py</span>
+      </div>
+      <pre><code class="language-python">import requests, os
+
+BASE = "https://customer.jetnetconnect.com"
+
+def login():
+    # CRITICAL: "emailAddress" -- capital A
+    r = requests.post(
+        f"{BASE}/api/Admin/APILogin",
+        json={
+            "emailAddress": os.environ["JETNET_EMAIL"],
+            "password":     os.environ["JETNET_PASSWORD"],
+        }
+    )
+    r.raise_for_status()
+    data = r.json()
+
+    # HTTP 200 does NOT mean success -- check this
+    if "ERROR" in data.get("responsestatus","").upper():
+        raise ValueError(f"Login failed: {data['responsestatus']}")
+
+    return data["bearerToken"], data["apiToken"]
+
+bearer, token = login()
+
+# Every request:
+#   URL:    .../endpoint/{token}
+#   Header: Authorization: Bearer {bearer}
+</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ENDPOINTS -->
+<section class="endpoints-section" id="endpoints">
+  <div class="section-label">Endpoint Reference</div>
+  <h2 class="section-title">Core Endpoints</h2>
+  <p class="section-subtitle">JETNET has two tiers: Tier A for real-time interactive lookups, Tier B for bulk data pipelines.</p>
+
+  <div class="endpoint-group">
+    <div class="endpoint-group-title">Aircraft — Tier A (Interactive)</div>
+    <table class="endpoint-table">
+      <thead>
+        <tr>
+          <th>Endpoint</th>
+          <th>Method</th>
+          <th>Response Key</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="inline">getRegNumber/{reg}/{apiToken}</code></td>
+          <td><span class="method method-get">GET</span></td>
+          <td><code class="inline">aircraftresult</code></td>
+          <td>Tail lookup. Returns flat companyrelationships.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getPictures/{id}/{apiToken}</code></td>
+          <td><span class="method method-get">GET</span></td>
+          <td><code class="inline">pictures</code></td>
+          <td>Aircraft photos by aircraftid.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getRelationships/{apiToken}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">relationships</code></td>
+          <td>Owner/operator/broker with nested company + contact objects.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getFlightDataPaged/{apiToken}/{ps}/{pg}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">flightdata</code></td>
+          <td>Flight activity history, paged.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="endpoint-group">
+    <div class="endpoint-group-title">Aircraft — Tier B (Bulk / Pipeline)</div>
+    <table class="endpoint-table">
+      <thead>
+        <tr>
+          <th>Endpoint</th>
+          <th>Method</th>
+          <th>Response Key</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="inline">getBulkAircraftExportPaged/{apiToken}/{ps}/{pg}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">aircraft</code></td>
+          <td>Hourly delta or full fleet. Use actiondate for incremental polls. Flat owr*/opr*/chp* schema.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getHistoryListPaged/{apiToken}/{ps}/{pg}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">history</code></td>
+          <td>Transaction and ownership history. transtype filter uses category prefixes.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getCondensedOwnerOperatorsPaged/{apiToken}/{ps}/{pg}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">aircraftowneroperators</code></td>
+          <td>Efficient bulk owner/operator lookup without full aircraft detail.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getAcCompanyFractionalReportPaged/{apiToken}/{ps}/{pg}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">aircraftcompfractionalrefs</code></td>
+          <td>Fractional ownership breakdown. fractionPercentOwned: "100.00" = whole owner.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="endpoint-group">
+    <div class="endpoint-group-title">Market Intelligence</div>
+    <table class="endpoint-table">
+      <thead>
+        <tr>
+          <th>Endpoint</th>
+          <th>Method</th>
+          <th>Key Filter</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="inline">getModelMarketTrends/{apiToken}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">modlist</code>, <code class="inline">displayRange</code></td>
+          <td>For-sale count, asking price, days on market by month.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getModelIntelligence/{apiToken}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">modlist</code>, year/range/pax filters</td>
+          <td>Aggregated fleet analytics: utilization, market metrics.</td>
+        </tr>
+        <tr>
+          <td><code class="inline">getModelPerformanceSpecs/{apiToken}</code></td>
+          <td><span class="method method-post">POST</span></td>
+          <td><code class="inline">modlist</code></td>
+          <td>Range, speed, cabin dimensions, payload specs.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- GUARDRAILS -->
+<section class="guardrails-section" id="guardrails">
+  <div class="section-label">Common Mistakes</div>
+  <h2 class="section-title">Guardrails</h2>
+  <p class="section-subtitle">These mistakes are responsible for the majority of failed integrations.</p>
+
+  <div class="guardrails-grid">
+    <div class="guardrail guardrail-error">
+      <h4>emailAddress — capital A</h4>
+      <p>The login field is <code>emailAddress</code>. Sending <code>email</code> or <code>emailaddress</code> returns HTTP 200 with an error body — not an HTTP error. You won't see this failure unless you check <code>responsestatus</code>.</p>
+    </div>
+    <div class="guardrail guardrail-error">
+      <h4>HTTP 200 ≠ Success</h4>
+      <p>JETNET returns application errors inside a 200 response. Always check <code>data["responsestatus"]</code> for strings starting with <code>"ERROR"</code> or <code>"INVALID"</code> on every call.</p>
+    </div>
+    <div class="guardrail guardrail-warn">
+      <h4>apiToken in URL only</h4>
+      <p>The <code>apiToken</code> belongs in the URL path — never in request headers or the JSON body. Only <code>bearerToken</code> goes in the <code>Authorization</code> header.</p>
+    </div>
+    <div class="guardrail guardrail-warn">
+      <h4>maxpages: 0 on bulk export</h4>
+      <p><code>getBulkAircraftExport</code> returns <code>maxpages: 0</code> when all results fit on one page. Use <code>max(maxpages, 1)</code> in your loop or you'll exit immediately and collect nothing.</p>
+    </div>
+    <div class="guardrail guardrail-warn">
+      <h4>Date format includes time</h4>
+      <p>For hourly bulk export polling, <code>actiondate</code> requires the time component: <code>"02/26/2026 10:00:00"</code>. A date-only string collapses your poll window to midnight.</p>
+    </div>
+    <div class="guardrail guardrail-warn">
+      <h4>companyrelation vs. relationtype</h4>
+      <p><code>getRegNumber</code> uses <code>companyrelation</code> (flat schema). <code>getRelationships</code> and <code>getHistoryList</code> use <code>relationtype</code> (nested schema). Using the wrong field returns nothing.</p>
+    </div>
+    <div class="guardrail guardrail-error">
+      <h4>transtype request vs. response values differ</h4>
+      <p>Request filter: <code>"FullSale"</code> (category prefix). Response field: <code>"Full Sale - Retail to Retail"</code> (full string). These are different values for the same transaction type.</p>
+    </div>
+    <div class="guardrail guardrail-ok">
+      <h4>Token lifetime is ~8 hours</h4>
+      <p>Tokens expire after ~8 hours. For 24/7 pipelines, store the token issue time and proactively re-login after 7 hours. On <code>INVALID SECURITY TOKEN</code>, re-login once and retry — never loop.</p>
+    </div>
+    <div class="guardrail guardrail-warn">
+      <h4>Empty aclist means no filter</h4>
+      <p><code>"aclist": []</code> means "no aircraft ID filter" — it returns all records, not zero. Be intentional about whether you want filtered or unfiltered results.</p>
+    </div>
+  </div>
+</section>
+
+<!-- EXAMPLES -->
+<section class="examples-section" id="examples">
+  <div class="section-label">Code Examples</div>
+  <h2 class="section-title">Working Code</h2>
+  <p class="section-subtitle">Copy-paste examples for the most common JETNET patterns.</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('tab-tail')">Tail Lookup</button>
+    <button class="tab" onclick="showTab('tab-paginate')">Pagination</button>
+    <button class="tab" onclick="showTab('tab-bulk')">Bulk Export</button>
+    <button class="tab" onclick="showTab('tab-history')">History Search</button>
+    <button class="tab" onclick="showTab('tab-ts')">TypeScript</button>
+  </div>
+
+  <div class="tab-content active" id="tab-tail">
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+        <span>Python — tail lookup (getRegNumber)</span>
+      </div>
+      <pre><code class="language-python">import requests, os
+
+BASE = "https://customer.jetnetconnect.com"
+
+def login():
+    r = requests.post(f"{BASE}/api/Admin/APILogin",
+        json={"emailAddress": os.environ["JETNET_EMAIL"],
+              "password":      os.environ["JETNET_PASSWORD"]})
+    r.raise_for_status()
+    d = r.json()
+    return d["bearerToken"], d["apiToken"]
+
+def lookup_tail(bearer, token, tail):
+    """Look up aircraft by tail number. Returns aircraftresult dict."""
+    r = requests.get(
+        f"{BASE}/api/Aircraft/getRegNumber/{tail}/{token}",
+        headers={"Authorization": f"Bearer {bearer}"}
+    )
+    r.raise_for_status()
+    data = r.json()
+    if "ERROR" in data.get("responsestatus", "").upper():
+        raise ValueError(f"JETNET: {data['responsestatus']}")
+    return data.get("aircraftresult")  # NOT "aircraft" -- "aircraftresult"
+
+bearer, token = login()
+ac = lookup_tail(bearer, token, "N12345")
+
+if ac:
+    print(ac["make"], ac["model"], ac["yearmfr"])
+
+    # companyrelationships uses flat schema with "companyrelation" field
+    for rel in ac.get("companyrelationships", []):
+        if rel["companyrelation"] == "Owner":
+            print("Owner:", rel["companyname"])
+            print("Contact:", rel["contactfirstname"], rel["contactlastname"])
+            print("Title:", rel["contacttitle"])
+            print("Phone:", rel["contactbestphone"])
+</code></pre>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-paginate">
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+        <span>Python — generic paginator</span>
+      </div>
+      <pre><code class="language-python">LIST_KEYS = {
+    "history", "flightdata", "events", "aircraft",
+    "aircraftowneroperators", "companylist", "contactlist",
+    "relationships", "aircraftcompfractionalrefs"
+}
+
+def get_all_pages(bearer, token, paged_path, body, pagesize=100):
+    """
+    Collect all pages from any JETNET paged endpoint.
+    paged_path: e.g. "/api/Aircraft/getHistoryListPaged/{apiToken}"
+    """
+    results, page = [], 1
+    base = "https://customer.jetnetconnect.com"
+    headers = {"Authorization": f"Bearer {bearer}",
+               "Content-Type": "application/json"}
+
+    while True:
+        url = f"{base}{paged_path}/{pagesize}/{page}".replace("{apiToken}", token)
+        r = requests.post(url, headers=headers, json=body)
+        r.raise_for_status()
+        data = r.json()
+
+        # Extract the list from whatever key holds the data
+        page_records = next(
+            (v for k, v in data.items()
+             if isinstance(v, list) and k in LIST_KEYS), []
+        )
+        results.extend(page_records)
+
+        # GUARDRAIL: maxpages=0 on small result sets is not an error.
+        # Use max(...,1) to avoid exiting before collecting page 1.
+        if page >= max(data.get("maxpages", 1), 1):
+            break
+        page += 1
+
+    return results
+
+# Example: all Gulfstream G550 history
+history = get_all_pages(
+    bearer, token,
+    "/api/Aircraft/getHistoryListPaged/{apiToken}",
+    body={
+        "modlist": [145],       # G550 model ID
+        "aclist": [],
+        "actiondate": "",
+        "transtype": ["None"],  # all transaction types
+        "isnewaircraft": "Ignore",
+        "ispreownedtrans": "Ignore",
+        "isinternaltrans": "Ignore",
+    }
+)
+print(f"{len(history)} history records")
+</code></pre>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-bulk">
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+        <span>Python — hourly bulk export poll</span>
+      </div>
+      <pre><code class="language-python">from datetime import datetime, timedelta
+import requests, os
+
+BASE = "https://customer.jetnetconnect.com"
+
+def poll_bulk_export(bearer, token, hours_back=1):
+    """
+    Fetch all business jet records changed in the last N hours.
+    Returns a list of flat aircraft dicts using owr*/opr*/chp* prefixes.
+    """
+    now     = datetime.utcnow()
+    since   = now - timedelta(hours=hours_back)
+
+    # GUARDRAIL: actiondate MUST include time HH:MM:SS for hourly windows.
+    # Date-only collapses the window to midnight.
+    body = {
+        "airframetype": "None",
+        "maketype": "BusinessJet",
+        "lifecycle": "InOperation",
+        "actiondate": since.strftime("%m/%d/%Y %H:%M:%S"),
+        "enddate":    now.strftime("%m/%d/%Y %H:%M:%S"),
+        "exactMatchReg": False,
+        "showHistoricalAcRefs": False,
+        "showAwaitingDocsCompanies": False,
+        "showMaintenance": False,
+        "showAdditionalEquip": False,
+        "showExterior": False,
+        "showInterior": False,
+    }
+
+    results, page = [], 1
+    headers = {"Authorization": f"Bearer {bearer}",
+               "Content-Type": "application/json"}
+
+    while True:
+        url = f"{BASE}/api/Aircraft/getBulkAircraftExportPaged/{token}/100/{page}"
+        r = requests.post(url, headers=headers, json=body)
+        r.raise_for_status()
+        data = r.json()
+
+        results.extend(data.get("aircraft", []))
+
+        # maxpages=0 means single-page result -- not an error
+        if page >= max(data.get("maxpages", 1), 1):
+            break
+        page += 1
+
+    return results
+
+# Usage
+aircraft = poll_bulk_export(bearer, token, hours_back=1)
+for ac in aircraft:
+    # Flat prefixed schema: owr* = owner, opr* = operator
+    print(ac["regnbr"], ac.get("owrcompanyname"), ac.get("forsale"))
+</code></pre>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-history">
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+        <span>Python — transaction / comp search</span>
+      </div>
+      <pre><code class="language-python">def search_transactions(bearer, token, modlist, transtype_cat="FullSale",
+                         start="01/01/2023", end="12/31/2024"):
+    """
+    Search ownership history by model and transaction type.
+
+    transtype request uses CATEGORY prefixes (not the full response strings):
+        "None"          - all types
+        "FullSale"      - full retail sales
+        "Lease"         - lease transactions
+        "InternalSale"  - internal/fleet transfers
+
+    Response transtype is a full string: "Full Sale - Retail to Retail"
+    """
+    body = {
+        "modlist": modlist,
+        "aclist": [],
+        "actiondate": start,
+        "endactiondate": end,
+        "transtype": [transtype_cat],
+        "isnewaircraft": "Ignore",
+        "ispreownedtrans": "Ignore",
+        "isinternaltrans": "Ignore",
+    }
+
+    results = get_all_pages(
+        bearer, token,
+        "/api/Aircraft/getHistoryListPaged/{apiToken}",
+        body
+    )
+
+    # History uses NESTED companyrelationships schema with "relationtype" field
+    # (NOT "companyrelation" -- that's getRegNumber's flat schema)
+    for tx in results:
+        seller = next((r for r in tx.get("companyrelationships", [])
+                       if r.get("relationtype") == "Seller"), None)
+        buyer  = next((r for r in tx.get("companyrelationships", [])
+                       if r.get("relationtype") == "Purchaser"), None)
+        if seller and buyer:
+            s_co = seller.get("company", {})
+            b_co = buyer.get("company", {})
+            print(f"{tx['regnbr']} | {tx['transtype']} | "
+                  f"{s_co.get('name')} -> {b_co.get('name')}")
+
+    return results
+
+# Example: G550 full sales 2023-2024
+txns = search_transactions(bearer, token, modlist=[145])
+</code></pre>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-ts">
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+        <span>TypeScript — login + tail lookup (Next.js / Node)</span>
+      </div>
+      <pre><code class="language-typescript">const BASE_URL = 'https://customer.jetnetconnect.com'
+
+interface Session {
+  bearerToken: string
+  apiToken: string
+  issuedAt: number  // Date.now()
+}
+
+const TOKEN_TTL_MS = 7 * 60 * 60 * 1000  // 7 hours
+
+let _session: Session | null = null
+
+async function getSession(): Promise&lt;Session&gt; {
+  const now = Date.now()
+  if (_session && now - _session.issuedAt &lt; TOKEN_TTL_MS) {
+    return _session
+  }
+
+  const res = await fetch(`${BASE_URL}/api/Admin/APILogin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    // CRITICAL: "emailAddress" -- capital A
+    body: JSON.stringify({
+      emailAddress: process.env.JETNET_EMAIL,
+      password: process.env.JETNET_PASSWORD,
+    }),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) throw new Error(`JETNET login HTTP ${res.status}`)
+  const data = await res.json()
+
+  const status = String(data.responsestatus ?? '')
+  if (status.toUpperCase().startsWith('ERROR')) {
+    throw new Error(`JETNET login error: ${status}`)
+  }
+
+  _session = {
+    bearerToken: data.bearerToken,
+    apiToken: data.apiToken,
+    issuedAt: Date.now(),
+  }
+  return _session
+}
+
+async function lookupTail(tail: string) {
+  const { bearerToken, apiToken } = await getSession()
+
+  const res = await fetch(
+    `${BASE_URL}/api/Aircraft/getRegNumber/${tail.toUpperCase()}/${apiToken}`,
+    { headers: { Authorization: `Bearer ${bearerToken}` }, cache: 'no-store' }
+  )
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+  const data = await res.json()
+  // HTTP 200 does NOT mean success -- check responsestatus
+  const status = String(data.responsestatus ?? '')
+  if (status.toUpperCase().startsWith('ERROR')) {
+    throw new Error(`JETNET error: ${status}`)
+  }
+
+  // Response key is "aircraftresult" (object), NOT "aircraft"
+  return data.aircraftresult as Record&lt;string, unknown&gt;
+}
+
+// Usage
+const aircraft = await lookupTail('N12345')
+const rels = (aircraft.companyrelationships as any[]) ?? []
+const owner = rels.find(r =&gt; r.companyrelation === 'Owner')
+console.log(owner?.companyname, owner?.contactfirstname)
+</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>JETNET API Developer Guide &mdash; Built for Jetnet Connect integrations.</p>
+  <p style="margin-top:.5rem;">
+    <a href="https://customer.jetnetconnect.com/swagger/index.html" target="_blank">Swagger Docs</a>
+    &nbsp;&bull;&nbsp;
+    <a href="https://www.jetnet.com" target="_blank">jetnet.com</a>
+  </p>
+</footer>
+
+<script>
+  // Initialize syntax highlighting
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('pre code').forEach(block => {
+      hljs.highlightElement(block)
+    })
+  })
+
+  // Tab switching
+  function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'))
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'))
+    document.getElementById(id).classList.add('active')
+    event.target.classList.add('active')
+  }
+</script>
+
+</body>
+</html>

@@ -1,120 +1,150 @@
-# Prompt: Fleet Watchlist Alerts
+# Prompt 03: Fleet Watchlist Change Alerts
 
-## App goal
+> Paste this into Cursor Composer or GitHub Copilot Chat.
+> Fill in the [PLACEHOLDER] values before pasting.
 
-Build a monitoring tool that tracks a fleet of aircraft by model type, detects ownership changes or transaction events, and alerts the user when something changes — useful for brokers, MROs, and competitive intelligence teams.
+---
 
-## UI screens
+Build a Python script that monitors a watchlist of aircraft for ownership changes,
+market status changes, and new "for sale" listings, then sends a summary alert
+email (or Slack message) when anything changes.
 
-1. **Watchlist setup** — Select aircraft models to monitor (e.g., G650, Citation CJ3+), set check interval (default: daily), optional geographic filter by base state/country
-2. **Dashboard** — Summary cards showing: total aircraft tracked, new ownership changes since last check, recent transactions
-3. **Change log** — Table of detected changes: aircraft reg, old owner, new owner, transaction type, transaction date
-4. **Aircraft detail** — Click a row to see full aircraft card with current relationships and flight activity
+## Project context
 
-## API workflow
+- Language: Python 3.11+
+- JETNET base URL: https://customer.jetnetconnect.com
+- Session helper: use `src/jetnet/session.py` (already in this repo)
+- Paginator: use `scripts/paginate.py` (`get_bulk_export`)
+- State storage: JSON file (`watchlist_state.json`) for simplicity; swap for a DB later
+- Alert: email via SMTP or Slack webhook (configurable via env vars)
 
-Call these endpoints in this exact order:
+## What to build
 
-1. **Login** — `POST /api/Admin/APILogin` with `{ "emailAddress": "...", "password": "..." }`
-   - Store `bearerToken` and `apiToken` server-side
-2. **Fleet snapshot** — `POST /api/Aircraft/getCondensedOwnerOperatorsPaged/{apiToken}/100/1`
-   - Body: `{ "modlist": [MODEL_IDS], "lifecycle": "InOperation", "aclist": [], "modlist": [MODEL_IDS], "actiondate": "", "exactMatchReg": false, "showHistoricalAcRefs": false }`
-   - Page through all results — treat `maxpages: 0` as 1 page
-   - Response key is `aircraftowneroperators`
-   - Store as baseline on first run
-3. **Change detection (subsequent runs)** — Same endpoint with `actiondate` set to last check time
-   - `actiondate`: `"MM/DD/YYYY"` of last successful check
-   - `enddate`: today's date
-   - Only records changed since `actiondate` are returned
-4. **Transaction history for changed aircraft** — `POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1`
-   - Body: `{ "aclist": [CHANGED_AIRCRAFT_IDS], "transtype": ["None"], "allrelationships": true, "startdate": "MM/DD/YYYY", "enddate": "MM/DD/YYYY", "modlist": [] }`
-   - This reveals who sold, who bought, transaction type, and dates
-5. **Detail drill-down (on demand)** — For a specific aircraft:
-   - `GET /api/Aircraft/getRegNumber/{reg}/{apiToken}` — aircraft identity
-   - `POST /api/Aircraft/getRelationships/{apiToken}` — current owner/operator
-   - `POST /api/Aircraft/getFlightDataPaged/{apiToken}/100/1` — recent flights
+### Script: `fleet_watchlist.py`
 
-## Response shaping contract
+#### Watchlist input
 
-Normalize change alerts into this shape:
+A JSON file `watchlist.json` defining the aircraft to monitor. Two modes:
 
+Mode 1: specific tail numbers
+```json
+{ "tails": ["N12345", "N67890", "N11111"] }
+```
+
+Mode 2: model filter (all aircraft of a given model)
+```json
+{ "modlist": [145, 1194], "maketype": "BusinessJet" }
+```
+
+#### JETNET call
+
+Use `getBulkAircraftExportPaged` with `actiondate` set to the last run time
+(stored in state file). This returns only aircraft records that changed since
+the last poll.
+
+POST body:
 ```json
 {
-  "aircraft": {
-    "id": 211461,
-    "reg": "N123AB",
-    "make": "GULFSTREAM",
-    "model": "G650",
-    "year": 2018
-  },
-  "change": {
-    "type": "Full Sale - Retail to Retail",
-    "date": "2026-01-15",
-    "previousOwner": {
-      "companyId": 350427,
-      "companyName": "Old Owner LLC"
-    },
-    "newOwner": {
-      "companyId": 789,
-      "companyName": "New Owner Corp"
-    }
-  },
-  "currentOperator": {
-    "companyId": 456,
-    "companyName": "Flight Ops Inc."
-  },
-  "detectedAt": "2026-02-10T14:30:00Z"
+  "airframetype": "None",
+  "maketype": "BusinessJet",
+  "lifecycle": "InOperation",
+  "actiondate": "MM/DD/YYYY HH:MM:SS",
+  "enddate": "MM/DD/YYYY HH:MM:SS",
+  "exactMatchReg": false,
+  "showHistoricalAcRefs": false,
+  "showAwaitingDocsCompanies": false,
+  "showMaintenance": false,
+  "showAdditionalEquip": false,
+  "showExterior": false,
+  "showInterior": false
 }
 ```
 
-- `previousOwner` and `newOwner` come from history records — look for `relationtype` of `"Seller"` and `"Purchaser"` in `companyrelationships`
-- `currentOperator` comes from `getCondensedOwnerOperators` or `getRelationships`
-- `detectedAt` is the timestamp your system noticed the change
+IMPORTANT: `actiondate` and `enddate` accept datetime strings (`MM/DD/YYYY HH:MM:SS`),
+not just dates. `maxpages: 0` means single-page result -- not an error.
 
-## Auth/session rules
+#### Flat schema fields to track
 
-- Use the session helpers from `src/jetnet/session.py` (Python) or `src/jetnet/session.js` (JavaScript)
-- Call `ensureSession()` / `ensure_session()` before every API request — this validates the token via `GET /api/Utility/getAccountInfo/{apiToken}` and re-logs in automatically if the token is invalid
-- Use `jetnetRequest()` / `jetnet_request()` for all API calls — it handles auth headers, token insertion, and single retry on `INVALID SECURITY TOKEN`
-- Token TTL is 60 minutes; session helpers proactively refresh at 50 minutes
-- For long-running polling jobs, session helpers handle automatic token renewal — do not implement your own refresh loop
-- Store all credentials and tokens server-side only
+The bulk export uses a prefixed flat schema:
+- `forsale` -- "Y" / "N" / "" (string, not boolean)
+- `status` -- "For Sale, Immediate" / "Not For Sale" / etc.
+- `asking` -- asking price string
+- `owrcompanyname` -- owner company name
+- `owrfname`, `owrlname` -- owner contact
+- `oprcompanyname` -- operator company name
 
-## Error rules
+#### Change detection
 
-- Always check `responsestatus` in every JETNET response — HTTP 200 does not mean success
-- If `responsestatus` contains `"ERROR"`, surface the message to the user
-- On `"ERROR: INVALID SECURITY TOKEN"`, re-login once and retry — do not loop
-- If the retry also fails, surface the error
-- When paging, if `maxpages` is 0, treat as 1 page — do not skip
-- `transtype` request values are category prefixes (e.g., `"FullSale"`, `"Lease"`), but response values are full strings (e.g., `"Full Sale - Retail to Retail"`) — do not compare them directly
+Compare each aircraft record to `watchlist_state.json`. Flag changes in:
+- `forsale` flipped to "Y"
+- `status` changed
+- `owrcompanyname` changed (ownership change)
+- `asking` changed
 
-## Definition of done
+#### Alert content
 
-- [ ] User can select models to watch and see a fleet dashboard
-- [ ] First run captures a baseline fleet snapshot
-- [ ] Subsequent runs use `actiondate` for incremental change detection
-- [ ] Ownership changes are detected and displayed in the change log
-- [ ] Transaction history is fetched for changed aircraft to show buyer/seller
-- [ ] Login uses `emailAddress` (capital A)
-- [ ] `bearerToken` in header, `apiToken` in URL path
-- [ ] `responsestatus` is checked on every response
-- [ ] Token is validated via `/getAccountInfo` using session helpers
-- [ ] Dates use `MM/DD/YYYY` format, computed dynamically
-- [ ] Pagination handles `maxpages: 0` correctly
-- [ ] Drill-down shows full aircraft detail on demand
+Build a plain-text or HTML summary of all changes found:
+```
+JETNET Fleet Alert -- 3 changes detected (2026-02-27 10:00 UTC)
 
-## Do not do
+N12345 -- GULFSTREAM G550 (2019)
+  OWNERSHIP CHANGE: Acme Corp -> Beta Holdings LLC
+  NEW CONTACT: Jane Doe, Director of Aviation, jane@beta.com
 
-- Do not poll more frequently than necessary — daily is usually sufficient for ownership changes
-- Do not hardcode dates or model IDs — compute dates at runtime, make model IDs configurable
-- Do not re-pull the entire fleet every run — use `actiondate` for incremental sync
-- Do not send raw JETNET responses to the frontend — normalize first
-- Do not send tokens or credentials to the browser
-- Do not retry on auth failure more than once
-- Do not ignore `responsestatus` — HTTP 200 can still be an error
-- Do not use `emailaddress` (lowercase a) — the field is `emailAddress`
-- Do not put `apiToken` in headers or request body — it goes in the URL path only
-- Do not swap `bearerToken` and `apiToken`
-- Do not compare `transtype` request values to response values directly — they use different formats
-- Do not implement your own token refresh loop — use the session helpers which call `/getAccountInfo` for validation
+N67890 -- CITATION CJ3+ (2022)
+  NOW FOR SALE: For Sale, Immediate | Asking: Inquire
+```
+
+#### Alert delivery
+
+Configurable via env vars:
+- `ALERT_MODE=email` -- SMTP
+- `ALERT_MODE=slack` -- POST to `SLACK_WEBHOOK_URL`
+- `ALERT_MODE=print` -- stdout only (default for dev/testing)
+
+#### State management
+
+- On first run: fetch all watchlist aircraft, store current state, send no alert.
+- On subsequent runs: compare to stored state, alert on changes, update state.
+- Store state in `watchlist_state.json` as `{ "last_run": "ISO_DATETIME", "aircraft": { "N12345": {...snapshot...} } }`
+
+#### Auth/session rules
+
+- Token TTL is 60 minutes; proactively refresh at 50 minutes
+- Validate tokens via `GET /api/Admin/getAccountInfo/{apiToken}` before long workflows
+- On `INVALID SECURITY TOKEN`: re-login once and retry -- do not loop
+- `emailAddress` has a capital A
+
+#### Environment variables
+
+```
+JETNET_EMAIL
+JETNET_PASSWORD
+JETNET_BASE_URL     # optional
+WATCHLIST_FILE      # default: watchlist.json
+STATE_FILE          # default: watchlist_state.json
+ALERT_MODE          # email | slack | print (default: print)
+SLACK_WEBHOOK_URL   # if ALERT_MODE=slack
+SMTP_HOST           # if ALERT_MODE=email
+SMTP_PORT           # if ALERT_MODE=email
+SMTP_USER           # if ALERT_MODE=email
+SMTP_PASSWORD       # if ALERT_MODE=email
+ALERT_FROM          # if ALERT_MODE=email
+ALERT_TO            # if ALERT_MODE=email
+```
+
+## Output
+
+Produce: `fleet_watchlist.py`
+
+Make it runnable as a cron job:
+```bash
+0 * * * * JETNET_EMAIL=... python /path/to/fleet_watchlist.py
+```
+
+Print progress to stdout with timestamps:
+```
+[2026-02-27 10:00:01] Polling JETNET for changes since 2026-02-27 09:00:00 ...
+[2026-02-27 10:00:03] 3 aircraft changed. Sending alert.
+[2026-02-27 10:00:04] Alert sent. State updated.
+```

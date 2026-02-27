@@ -1,0 +1,27 @@
+{
+  "_comment": "getModelPerformanceSpecs -- range, speed, cabin, payload specs for comparison",
+  "endpoint": "POST /api/Model/getModelPerformanceSpecs/{apiToken}",
+  "tier": "A",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Model/getModelPerformanceSpecs/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "modelid": 0,
+      "airframetype": "None",
+      "maketype": "None",
+      "make": "",
+      "annualhours": 0,
+      "fuelprice": 0,
+      "modlist": [145, 634]
+    }
+  },
+  "notes": [
+    "useful for competitive model comparisons -- pass multiple modlist IDs",
+    "annualhours and fuelprice can be set to 0 if not needed for cost calc",
+    "pair with getModelOperationCosts for full cost + performance picture"
+  ]
+}

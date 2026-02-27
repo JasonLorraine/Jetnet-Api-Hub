@@ -1,0 +1,54 @@
+{
+  "_comment": "getRelationships -- Pattern B: bulk fleet lookup (Tier B, pass list of aircraftids)",
+  "endpoint": "POST /api/Aircraft/getRelationships/{apiToken}",
+  "tier": "B",
+  "request": {
+    "method": "POST",
+    "url": "https://customer.jetnetconnect.com/api/Aircraft/getRelationships/{apiToken}",
+    "headers": {
+      "Authorization": "Bearer {bearerToken}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "aclist": [7103, 8542, 11200, 15033, 22981, 34120, 45678, 56789, 67890, 78901],
+      "modlist": [],
+      "actiondate": "",
+      "showHistoricalAcRefs": false
+    }
+  },
+  "response": {
+    "responseid": "555667427",
+    "responsestatus": "SUCCESS",
+    "aircraftcount": 241,
+    "count": 1466,
+    "relationships": [
+      {
+        "aircraftid": 7103,
+        "regnbr": "N601BE",
+        "companyid": 350427,
+        "name": "Express Transportation Corporation",
+        "relationtype": "Owner",
+        "relationseqno": 1,
+        "contactid": 524808,
+        "ownerpercent": null,
+        "fractionpurchasedate": null,
+        "fractionexpiresdate": null,
+        "isoperator": "N",
+        "businesstype": "End User",
+        "company": {
+          "companyid": 350427,
+          "parentcompanyid": 0,
+          "active": true
+        }
+      }
+    ]
+  },
+  "notes": [
+    "send hundreds of aircraftids in aclist for one-call bulk ownership lookup",
+    "aircraftcount = number of distinct aircraft matched in the response",
+    "count = total relationship records (Owner + Operator + Chief Pilot per aircraft)",
+    "same response structure as Pattern A -- nested company sub-objects, relationtype field",
+    "to get primary owner per aircraft: filter on relationtype=='Owner' and relationseqno==1"
+  ],
+  "python_snippet": "owners = {r['aircraftid']: r for r in data['relationships'] if r['relationtype'] == 'Owner' and r['relationseqno'] == 1}"
+}
