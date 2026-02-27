@@ -1,0 +1,9 @@
+[project]
+name = "jetnet-api-docs"
+version = "1.0.0"
+description = "JETNET API Documentation & Examples - Complete developer guide for the JETNET aviation database API"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.1.3",
+    "requests>=2.32.5",
+]
