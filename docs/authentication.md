@@ -64,7 +64,7 @@ export JETNET_PASSWORD="your_password"
 
 ## Token Refresh Pattern
 
-Tokens expire after approximately **8 hours** of inactivity. For long-running pipelines, proactively re-login before expiry rather than waiting for a failure.
+Tokens expire after **60 minutes**. For long-running pipelines, proactively re-login before expiry rather than waiting for a failure.
 
 ### Python
 
@@ -73,7 +73,7 @@ import time, os, requests
 
 BASE = "https://customer.jetnetconnect.com"
 token_issued = 0
-TOKEN_TTL = 7 * 3600  # refresh after 7h (tokens last ~8h)
+TOKEN_TTL = 50 * 60  # refresh after 50 min (tokens last 60 min)
 
 def login(email, password):
     r = requests.post(f"{BASE}/api/Admin/APILogin",
@@ -95,7 +95,7 @@ def get_tokens():
 ```javascript
 const BASE = "https://customer.jetnetconnect.com";
 let bearerToken, apiToken, tokenIssued = 0;
-const TOKEN_TTL = 7 * 3600 * 1000; // 7 hours in ms
+const TOKEN_TTL = 50 * 60 * 1000; // 50 minutes in ms
 
 async function login(email, password) {
   const res = await fetch(`${BASE}/api/Admin/APILogin`, {

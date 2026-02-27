@@ -15,7 +15,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
 - **JETNET API Base URL:** `https://customer.jetnetconnect.com`
 - **Auth:** POST to `/api/Admin/APILogin` with `emailAddress` (capital A) and `password`
 - **Two tokens:** `bearerToken` (in Authorization header) and `apiToken` (in URL path only)
-- **Token lifetime:** ~8 hours, refresh proactively after 7h
+- **Token lifetime:** 60 minutes, refresh proactively after 50 minutes
 - **Date format:** `MM/DD/YYYY` with leading zeros
 - **Pagination:** 1-based pages, use `maxpages` for loop control
 

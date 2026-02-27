@@ -325,7 +325,7 @@ Every subsequent call:
   URL:     .../{apiToken}/...
 ```
 
-Tokens expire after ~8 hours of inactivity. For pipelines, refresh proactively after 7 hours.
+Tokens expire after 60 minutes. For pipelines, refresh proactively after 50 minutes.
 On `INVALID SECURITY TOKEN`: re-login and retry once. Never loop.
 
 ---

@@ -18,7 +18,7 @@ import requests
 
 BASE = "https://customer.jetnetconnect.com"
 
-TOKEN_TTL = 7 * 3600
+TOKEN_TTL = 50 * 60  # refresh after 50 min (tokens last 60 min)
 
 
 def login(email, password):
