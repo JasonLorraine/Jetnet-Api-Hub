@@ -21,6 +21,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `model-data.md` - Model reference: getModelOperationCosts, getModelPerformanceSpecs, getModelIntelligence
   - `airports.md` - Airport reference data: getAirportList, geographic dimension table for joins
   - `utility-endpoints.md` - Cacheable reference/dimension tables: lifecycle, makes, models, JNIQ sizes, airframe types, event categories
+  - `aircraft.md` - 21 Aircraft endpoints: getAircraft (full record), 14 sub-record GETs (identification, airframe, engine, apu, avionics, features, additionalequipment, interior, exterior, maintenance, leases, pictures, status, companyrelationships), tail/hex lookup (getRegNumber, getHexNumber), fleet search (getAircraftList), batch relationships, getAllAircraftObjects
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps

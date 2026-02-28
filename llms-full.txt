@@ -1,3 +1,12 @@
+# JETNET API -- Complete AI/LLM Reference
+
+This file is auto-generated. Source files concatenated below.
+
+
+---
+# SOURCE: llms.txt
+---
+
 # JETNET API (Jetnet Connect) -- AI Agent Reference
 
 > Base URL: https://customer.jetnetconnect.com
@@ -57,12 +66,29 @@ All POST endpoints require a JSON body with at minimum aclist and modlist. See p
 
 | Endpoint | Response Key | Type |
 |----------|-------------|------|
+| getAircraft | aircraft | Object (composite with all sub-records) |
+| getIdentification | identification | Object |
+| getStatus | status | Object |
+| getAirframe | airframe | Object (aftt, landings, timesasofdate) |
+| getEngine | engine | Object (contains engines[] sub-array) |
+| getApu | apu | Object or null |
+| getAvionics | avionics | Array + count |
+| getFeatures | features | Array + count |
+| getAdditionalEquipment | additionalequipment | Array + count |
+| getInterior | interior | Object |
+| getExterior | exterior | Object |
+| getMaintenance | maintenance | Object |
+| getLeases | leases | Array or null |
+| getCompanyrelationships | companyrelationships | Array + count |
+| getFlights | flightsummary | Object/Array |
 | getRegNumber | aircraftresult | Object |
+| getHexNumber | aircraft | Object |
 | getAircraftList | aircraft | Array |
+| getRelationships | relationships | Array |
+| getAllAircraftObjects | allaircraftobjects | Array |
 | getHistoryListPaged | history | Array |
 | getFlightDataPaged | flightdata | Array |
 | getEventListPaged | events | Array |
-| getRelationships | relationships | Array |
 | getBulkAircraftExport | aircraft | Array |
 | getCondensedOwnerOperators | aircraftowneroperators | Array |
 | getPictures | pictures | Array |
@@ -145,6 +171,32 @@ CompanyCard: companyId, name, city, state, country, phone, email, contact (Conta
 ContactCard: contactId, firstName, lastName, title, email, phone
 
 GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, categorySize, weightClass, forSale, askingPrice, owner, operator, chiefPilot, baseIcao, baseAirport, baseCountry, dataSource="JETNET"
+
+## Aircraft Endpoints (docs/aircraft.md)
+
+Three access patterns for aircraft data:
+
+1. Full record: GET /api/Aircraft/getAircraft/{id}/{apiToken} -> `aircraft` (composite with all sub-records)
+2. Sub-records (14 GET endpoints, all /api/Aircraft/{endpoint}/{id}/{apiToken}):
+   - getIdentification -> identification | getStatus -> status | getAirframe -> airframe (aftt, landings)
+   - getEngine -> engine (engines[] sub-array) | getApu -> apu (null if missing) | getAvionics -> avionics[]
+   - getFeatures -> features[] | getAdditionalEquipment -> additionalequipment[] | getInterior -> interior
+   - getExterior -> exterior | getMaintenance -> maintenance | getLeases -> leases (null if missing)
+   - getPictures -> pictures[] | getCompanyrelationships -> companyrelationships[] (isoperator is "Y"/"N" string)
+3. Quick lookup: GET /api/Aircraft/getRegNumber/{tail}/{apiToken} -> aircraftresult (flat schema)
+   GET /api/Aircraft/getHexNumber/{hex}/{apiToken} -> aircraft
+
+Fleet search: POST /api/Aircraft/getAircraftList/{apiToken} -> aircraft[] (no paged variant -- use filters to limit)
+Batch relationships: POST /api/Aircraft/getRelationships/{apiToken} -> relationships[] (nested schema with relationtype)
+Bulk detail: POST /api/Aircraft/getAllAircraftObjects/{apiToken}/{pagesize}/{page} -> allaircraftobjects[] (requires aclist)
+
+Gotchas:
+- getApu returns null with "SUCCESS: NO RESULTS FOUND [APU]" -- still starts with "SUCCESS"
+- getEngine has engine.engines[] sub-array (two levels: model data + per-engine data)
+- getCompanyrelationships.isoperator is string "Y"/"N" not boolean
+- getAircraftList has NO paged variant; use getBulkAircraftExportPaged for large datasets
+- getRegNumber uses flat schema (companyrelation); getRelationships uses nested (relationtype)
+- getFlights (flight summary) is at /api/Aircraft/getFlights/{id}/{apiToken} -> flightsummary
 
 ## Bulk Export (getBulkAircraftExportPaged)
 
@@ -410,10 +462,143 @@ All tools handle auth, token refresh (50 min), pagination, responsestatus checks
 | mcp/jetnet_mcp.py | MCP server: 8 tools for AI agents (Claude, Cursor, Copilot) | Python |
 | mcp/README.md | MCP setup, tool reference, example conversations | Markdown |
 
+---
+# SOURCE: START_HERE.md
+---
 
+# Start Here
 
+New to the JETNET API? Pick your path and get running in minutes.
 
+---
 
+## What You Need
+
+- A JETNET API account (email + password)
+- Base URL: `https://customer.jetnetconnect.com`
+- Environment variables set: `JETNET_EMAIL`, `JETNET_PASSWORD`
+
+## How Auth Works
+
+1. POST credentials to `/api/Admin/APILogin` (field is `emailAddress` with a capital A)
+2. Response gives you two tokens: `bearerToken` and `apiToken`
+3. Every call after login: `bearerToken` in the `Authorization` header, `apiToken` in the URL path
+4. Tokens expire after 60 minutes
+5. Validate your session with `/api/Admin/getAccountInfo/{apiToken}` before long workflows
+6. On `INVALID SECURITY TOKEN`: re-login once and retry. Never loop.
+
+## HTTP 200 Does Not Mean Success
+
+JETNET returns HTTP 200 even for errors. Always check `responsestatus` in the JSON body:
+
+```
+if responsestatus starts with "ERROR" → it failed, even though HTTP said 200
+```
+
+---
+
+## Choose Your Path
+
+### Path A: "I want a demo UI in 5 minutes"
+
+You want to see a working app, type in a tail number, and get results.
+
+1. Go to [`templates/nextjs-tail-lookup/`](templates/nextjs-tail-lookup/)
+2. Copy `.env.example` to `.env.local`, fill in your credentials
+3. `npm install && npm run dev`
+4. Open `http://localhost:3000`, enter a tail number
+
+That's it. You have a working aircraft lookup app.
+
+**Also available:** [`templates/python-fastapi-golden-path/`](templates/python-fastapi-golden-path/) if you prefer Python.
+
+---
+
+### Path B: "I want bulk/export data"
+
+You want to sync fleet data, export history, or build analytics pipelines.
+
+1. Read the [Pagination Guide](docs/pagination.md) (1-based pages, `maxpages` loop)
+2. Look at [`examples/python/07_bulk_export.py`](examples/python/07_bulk_export.py) for the pattern
+3. Use [`scripts/paginate.py`](scripts/paginate.py) to handle pagination automatically
+4. For a full pipeline prompt, paste [`prompts/04_bulk_export_pipeline.md`](prompts/04_bulk_export_pipeline.md) into your IDE agent
+
+Key gotcha: `getBulkAircraftExportPaged` returns `maxpages: 0` for single-page results. Use `max(maxpages, 1)`.
+
+---
+
+### Path C: "I want CRM enrichment"
+
+You want to enrich contacts, generate leads, or monitor ownership changes.
+
+1. For FBO/airport leads: paste [`prompts/02_fbo_airport_activity_leads.md`](prompts/02_fbo_airport_activity_leads.md) into your IDE agent
+2. For fleet watchlist/alerts: paste [`prompts/03_fleet_watchlist_alerts.md`](prompts/03_fleet_watchlist_alerts.md) into your IDE agent
+3. Use the [`templates/python-fastapi-golden-path/`](templates/python-fastapi-golden-path/) as your backend starting point
+4. See [`snippets/ownership.md`](snippets/ownership.md) for quick copy-paste relationship lookups
+
+---
+
+### Path D: "I'm building an AI agent / code agent"
+
+You want to give an AI agent (Cursor, Copilot, custom GPT, LangChain, CrewAI, or your own) the ability to call the JETNET API.
+
+**Quickest path:** Feed [`llms.txt`](llms.txt) into your agent's context window. It contains every rule, gotcha, enum value, and response key in ~150 lines. For agents with large context windows, use [`llms-full.txt`](llms-full.txt) (~3100 lines, all docs).
+
+1. **Feed your agent the rules:** Copy [`src/jetnet/session.py`](src/jetnet/session.py) (Python) or [`src/jetnet/session.ts`](src/jetnet/session.ts) (TypeScript) into your agent's context -- it handles auth, token refresh, and error normalization automatically
+2. **Give it the model reference:** Load [`references/model-id-table.json`](references/model-id-table.json) so your agent can resolve aircraft makes/models to the correct `modlist` IDs (872 models across 67 makes)
+3. **Use the prompt recipes:** Paste any of the [`prompts/`](prompts/) into your agent as system instructions -- they are self-contained with API call sequences, error rules, and response shapes
+4. **Validate with evals:** Use [`evals/evals.json`](evals/evals.json) to test that your agent handles JETNET responses correctly
+5. **Normalize responses:** Use the contracts in [`docs/response-shapes.md`](docs/response-shapes.md) to ensure your agent outputs consistent shapes (AircraftCard, CompanyCard, GoldenPathResult)
+
+**Key files for agent context windows:**
+
+| File | Purpose | Size |
+|------|---------|------|
+| [`llms.txt`](llms.txt) | Single-file AI reference (all rules + gotchas + enums) | ~150 lines |
+| [`llms-full.txt`](llms-full.txt) | Complete reference (all docs concatenated) | ~3100 lines |
+| [`src/jetnet/session.py`](src/jetnet/session.py) | Auth + session management (drop into agent) | ~240 lines |
+| [`references/model-id-table.json`](references/model-id-table.json) | Model ID lookup (agent can resolve "G550" → modlist: [278]) | 872 entries |
+| [`docs/response-shapes.md`](docs/response-shapes.md) | Response contracts for structured output | ~440 lines |
+| [`docs/common-mistakes.md`](docs/common-mistakes.md) | Guardrails to prevent agent errors | ~170 lines |
+| [`evals/evals.json`](evals/evals.json) | Test cases for agent validation | 3 cases |
+| [`prompts/`](prompts/) | 4 ready-to-use system prompts | ~200 lines each |
+
+**Quick agent setup pattern:**
+
+```python
+context = open("llms.txt").read()
+model_ids = json.load(open("references/model-id-table.json"))
+
+system_prompt = open("prompts/01_golden_path_tail_lookup_app.md").read()
+```
+
+---
+
+## Session Helpers
+
+We provide production-ready session modules that handle login, token refresh, and validation automatically:
+
+- **Python:** [`src/jetnet/session.py`](src/jetnet/session.py)
+- **TypeScript:** [`src/jetnet/session.ts`](src/jetnet/session.ts)
+
+These use `/api/Admin/getAccountInfo` as a lightweight health check to validate your token before long workflows, and auto re-login once if the token has expired.
+
+---
+
+## Where to Go Next
+
+| Resource | When to use it |
+|----------|---------------|
+| [Authentication Guide](docs/authentication.md) | Deep dive into tokens, refresh, retry |
+| [Response Shapes](docs/response-shapes.md) | Normalized objects for your UI (AircraftCard, CompanyCard, etc.) |
+| [Common Mistakes](docs/common-mistakes.md) | Save yourself hours of debugging |
+| [Prompts](prompts/) | Paste into Cursor/Copilot to generate working apps |
+| [Model ID Lookup](references/model-ids.md) | Find the right `modlist` IDs for any aircraft make/model |
+| [Evals](evals/evals.json) | Test cases for validating AI agent responses |
+| [Full Endpoint Reference](references/endpoints.md) | Every endpoint with all parameters |
+
+---
+# SOURCE: docs/authentication.md
 ---
 
 # Authentication
@@ -609,7 +794,8 @@ python scripts/token_probe.py
 - Store credentials in environment variables or a secrets manager
 - Do not log tokens in production
 
-
+---
+# SOURCE: docs/pagination.md
 ---
 
 # Pagination
@@ -743,7 +929,8 @@ async function getBulkExport(bearerToken, apiToken, body, pagesize = 100) {
 }
 ```
 
-
+---
+# SOURCE: docs/response-handling.md
 ---
 
 # Response Handling
@@ -873,7 +1060,8 @@ Each role uses a different field prefix:
 | `getCondensedOwnerOperators` | `aircraftowneroperators` | Array |
 | `getPictures` | `pictures` | Array |
 
-
+---
+# SOURCE: docs/response-shapes.md
 ---
 
 # JETNET Response Shapes -- Normalized Contracts
@@ -1318,7 +1506,8 @@ export function aircraftCardFromRegNbr(raw: Record<string, unknown>): AircraftCa
 }
 ```
 
-
+---
+# SOURCE: docs/id-system.md
 ---
 
 # JETNET ID System
@@ -1461,7 +1650,1437 @@ The unique ID for a specific history transaction record. Every ownership change,
 http://www.jetnetevolution.com/DisplayAircraftDetail.aspx?acid={aircraftid}&jid={transid}
 ```
 
+---
+# SOURCE: docs/common-mistakes.md
+---
 
+# Common Mistakes
+
+## Authentication
+
+### `emailAddress` has a capital A
+
+The login field is `emailAddress` — not `email`, `emailaddress`, or `email_address`. This is the single most common auth mistake.
+
+```json
+// Wrong
+{ "email": "user@example.com", "password": "..." }
+{ "emailaddress": "user@example.com", "password": "..." }
+
+// Correct
+{ "emailAddress": "user@example.com", "password": "..." }
+```
+
+### `apiToken` goes in the URL path only
+
+The `apiToken` is placed in the URL path — never in headers or the JSON body.
+
+```
+// Wrong
+Authorization: Bearer {bearerToken} {apiToken}
+{ "apiToken": "abc123", ... }
+
+// Correct
+GET /api/Aircraft/getRegNumber/N123AB/{apiToken}
+Authorization: Bearer {bearerToken}
+```
+
+## Response Handling
+
+### HTTP 200 does not mean success
+
+JETNET returns HTTP 200 for most responses, including errors. Always check `responsestatus`:
+
+```python
+result = r.json()
+if "ERROR" in result.get("responsestatus", "").upper():
+    raise ValueError(f"JETNET error: {result['responsestatus']}")
+```
+
+### `companyrelation` vs `relationtype`
+
+Different endpoints use different field names for the relationship type. Using the wrong field returns nothing:
+
+| Endpoint | Field Name |
+|----------|-----------|
+| `getRegNumber` | `companyrelation` |
+| `getHistoryList` / `getRelationships` | `relationtype` |
+| `getBulkAircraftExport` | Field prefix (`owr*`, `opr*`, `chp*`) |
+| `getAcCompanyFractionalReportPaged` | `relation` |
+
+See [Response Handling](response-handling.md) for the full schema comparison.
+
+### `"SUCCESS: NO RESULTS FOUND"` is a normal response
+
+Several endpoints return `responsestatus` values like `"SUCCESS: NO RESULTS FOUND [PHONE NUMBERS]"` when a query matches zero records. This is **not an error** — it is a valid business state. Use a prefix check, not strict equality:
+
+```python
+# Wrong — breaks on "SUCCESS: NO RESULTS FOUND [...]"
+if result["responsestatus"] != "SUCCESS":
+    raise ValueError("Request failed")
+
+# Correct — treats any SUCCESS prefix as OK
+if not result.get("responsestatus", "").upper().startswith("SUCCESS"):
+    raise ValueError(f"JETNET error: {result['responsestatus']}")
+```
+
+```javascript
+// Wrong
+if (data.responsestatus !== "SUCCESS") throw new Error("Failed");
+
+// Correct
+if (!(data.responsestatus || "").toUpperCase().startsWith("SUCCESS")) {
+  throw new Error(`JETNET error: ${data.responsestatus}`);
+}
+```
+
+### Null arrays — guard before iterating
+
+Fields like `phonenumbers`, `relatedcompanies`, and `companycertifications` return `null` (not `[]`) when empty. Any code calling `.map()` or `.forEach()` without a guard will crash:
+
+```python
+# Wrong — TypeError if phonenumbers is None
+for p in result["phonenumbers"]:
+    print(p)
+
+# Correct
+for p in result.get("phonenumbers") or []:
+    print(p)
+```
+
+```javascript
+// Wrong — Cannot read properties of null
+data.phonenumbers.map(p => p.number);
+
+// Correct
+(data.phonenumbers ?? []).map(p => p.number);
+```
+
+### `isoperator` is a `"Y"` / `"N"` string
+
+In relationship data, `isoperator` is a string, not a boolean:
+
+```python
+# Wrong — always truthy because "N" is a non-empty string
+if record["isoperator"]:
+
+# Correct
+if record["isoperator"] == "Y":
+```
+
+## URL Shape Variations
+
+### Mixed URL patterns across endpoints
+
+JETNET endpoints use three different URL patterns. Trying to build all paths with a single template will break:
+
+```
+# Pattern 1: POST body + token only
+POST /api/Contact/getContactList/{apiToken}
+
+# Pattern 2: Resource ID + token
+GET /api/Contact/getContact/{contactId}/{apiToken}
+
+# Pattern 3: Token + pagination in path
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pageSize}/{page}
+```
+
+Build your URL helper to accept optional `id`, `pageSize`, and `page` parameters rather than assuming one shape fits all.
+
+## Response key changes between paged and non-paged variants
+
+The non-paged and paged versions of the same search endpoint use **different response keys**:
+
+| Endpoint (non-paged) | Response key | Endpoint (paged) | Response key |
+|----------------------|-------------|------------------|-------------|
+| `getContactList` | `contacts` | `getContactListPaged` | `contactlist` |
+| `getCompanyList` | `companies` | `getCompanyListPaged` | `companylist` |
+
+Non-paged endpoints also return `currentpage: 0` and `maxpages: 0` — do **not** interpret these as paging metadata.
+
+```python
+# Wrong — assumes same key for both variants
+data = response.json()
+records = data["contacts"]  # works for non-paged, breaks for paged
+
+# Correct — use the right key per variant
+if is_paged:
+    records = data["contactlist"]
+else:
+    records = data["contacts"]
+```
+
+## N+1 and Fan-Out Risks
+
+### Company → Contacts returns ID arrays, not full objects
+
+`getContacts` (`/api/Company/getContacts/{companyId}/{apiToken}`) returns contact IDs as a plain array — not hydrated contact objects:
+
+```json
+{ "contacts": [523097, 282591, 198443] }
+```
+
+To get full contact data, you must call `getContact` or `getIdentification` for **each** ID. This creates an N+1 fan-out problem. Mitigate with concurrency limits:
+
+```python
+import asyncio
+
+sem = asyncio.Semaphore(5)
+
+async def fetch_contact(session, contact_id):
+    async with sem:
+        return await session.get(f".../getContact/{contact_id}/{token}")
+
+tasks = [fetch_contact(session, cid) for cid in contact_ids]
+contacts = await asyncio.gather(*tasks)
+```
+
+```javascript
+// Limit concurrency to 5 at a time
+const pLimit = (await import("p-limit")).default;
+const limit = pLimit(5);
+
+const contacts = await Promise.all(
+  contactIds.map(id => limit(() => fetchContact(id)))
+);
+```
+
+### `ownerpercent` can be null even when relationship exists
+
+Do not assume `ownerpercent` or `fractionexpiresdate` are always populated on ownership/fractional relationships. Always provide a fallback:
+
+```python
+pct = record.get("ownerpercent") or "0.00"
+```
+
+## Filters and Payloads
+
+### Empty `aclist: []` means no filter, not empty results
+
+Sending `"aclist": []` does not return zero results — it removes the aircraft filter entirely, returning all matching records. Be intentional:
+
+```json
+// Returns ALL aircraft (no filter)
+{ "aclist": [], "modlist": [] }
+
+// Returns only these specific aircraft
+{ "aclist": [128228, 242781], "modlist": [] }
+```
+
+### `transtype: ["None"]` not `[]` for all history types
+
+To get all transaction types in history queries, send `["None"]` — not an empty array:
+
+```json
+// Wrong — may not return all types
+{ "transtype": [] }
+
+// Correct — returns all transaction types
+{ "transtype": ["None"] }
+```
+
+## Date Formatting
+
+### Use `MM/DD/YYYY` with leading zeros
+
+JETNET requires `MM/DD/YYYY` format with leading zeros:
+
+```json
+// Wrong
+{ "startdate": "1/1/2024" }
+
+// Correct
+{ "startdate": "01/01/2024" }
+```
+
+### `getBulkAircraftExport` accepts datetime strings
+
+The `actiondate` and `enddate` fields accept full datetime strings for hourly polling windows:
+
+```json
+{ "actiondate": "02/26/2026 10:00:00", "enddate": "02/26/2026 11:00:00" }
+```
+
+## String Booleans
+
+### `forsale` in responses is a string
+
+In most endpoints, `forsale` is `"true"` or `"false"` (strings), not JSON booleans:
+
+```python
+# Wrong
+if record["forsale"]:  # Always truthy because it's a non-empty string
+
+# Correct
+if record["forsale"] == "true":
+```
+
+### `getBulkAircraftExport` uses `"Y"` / `"N"` for forsale
+
+The bulk export endpoint uses a different convention:
+
+```python
+# In getBulkAircraftExport
+if record["forsale"] == "Y":
+```
+
+### `datepurchased` format differs in bulk export
+
+In `getBulkAircraftExport`, `datepurchased` is `YYYYMMDD` format (not `MM/DD/YYYY`).
+
+## Endpoint-Specific Issues
+
+### `getAircraftList` has no paged variant
+
+Unlike most list endpoints, `getAircraftList` does not have a paged version. Use filters (`modlist`, geographic params, `forsale`) to control result size.
+
+### `getEventList` enum values are strict
+
+Sending unrecognized enum values to `getEventList` produces an `ERROR` in `responsestatus` despite HTTP 200. Use `getEventTypes` and `getEventCategories` to get valid values first.
+
+### `getBulkAircraftExport` returns `maxpages: 0` for single-page results
+
+When all results fit in one call, the response has `maxpages: 0` and `currentpage: 0`. Use `max(maxpages, 1)` in your loop or you will exit immediately and miss all records:
+
+```python
+if page >= max(data.get("maxpages", 1), 1):
+    break
+```
+
+### `getAcCompanyFractionalReportPaged` response key
+
+The response key is `aircraftcompfractionalrefs`. Each row is one relationship per aircraft:
+
+- `fractionPercentOwned: "100.00"` = actual owner
+- `fractionPercentOwned: "0.00"` = operator/manager on same aircraft
+- The `relationship` filter is an array: `["Fractional Owner"]`
+
+## Field Name Gotchas
+
+### `getRegNumber` flat companyrelationships
+
+The flat schema uses `companyrelation` and prefixed fields (`companyname`, `contactfirstname`). For FBO ramp contact lookup, filter on `contacttitle` for Chief Pilot, Director of Aviation, Scheduler, or Dispatcher.
+
+### `getBulkAircraftExport` flat prefixed schema
+
+Role-prefixed fields: `owr*` = owner, `opr*` = operator, `chp*` = chief pilot, `excbrk1*`/`excbrk2*` = brokers, `addl1-3*` = additional. This is not the same schema as `getRegNumber` or `getRelationships`.
+
+---
+# SOURCE: docs/enum-reference.md
+---
+
+# Enum Reference
+
+## airframetype
+
+Filters by aircraft airframe category.
+
+| Value | Description |
+|-------|-------------|
+| `None` | No filter (all airframe types) |
+| `FixedWing` | Fixed-wing aircraft |
+| `Rotary` | Rotorcraft (helicopters) |
+
+## maketype
+
+Filters by aircraft propulsion/category.
+
+| Value | Description |
+|-------|-------------|
+| `None` | No filter (all make types) |
+| `JetAirliner` | Commercial jet airliners |
+| `BusinessJet` | Business jets |
+| `Turboprop` | Turboprop aircraft |
+| `Piston` | Piston-engine aircraft |
+| `Turbine` | Turbine-powered (helicopters) |
+
+## lifecycle
+
+Filters by aircraft operational status.
+
+| Value | Description |
+|-------|-------------|
+| `None` | No filter (all lifecycle stages) |
+| `InProduction` | Currently being manufactured |
+| `NewWithManufacturer` | Completed but not yet delivered |
+| `InOperation` | Active and in service |
+| `Retired` | Permanently out of service |
+| `InStorage` | Temporarily inactive / stored |
+
+## forsale (Request)
+
+Filters by for-sale status in request payloads. These are **string values**, not booleans.
+
+| Value | Description |
+|-------|-------------|
+| `"true"` | Only aircraft listed for sale |
+| `"false"` | Only aircraft not listed for sale |
+| `""` | No filter (all aircraft) |
+
+> **Note:** In `getBulkAircraftExport` responses, `forsale` uses `"Y"` / `"N"` instead.
+
+## isnewaircraft / ispreownedtrans / isinternaltrans
+
+Three-state filters used in history and transaction queries.
+
+| Value | Description |
+|-------|-------------|
+| `"Yes"` | Include only matching records |
+| `"No"` | Exclude matching records |
+| `"Ignore"` | No filter on this field |
+
+## transtype (Request)
+
+Transaction type categories used in history list request payloads. These are **category labels**, not the full descriptive strings returned in responses.
+
+| Value | Description |
+|-------|-------------|
+| `"None"` | All transaction types (no filter) |
+| `"FullSale"` | Full sale transactions |
+| `"Lease"` | Lease transactions |
+| `"InternalSale"` | Internal/corporate transfers |
+| `"Management"` | Management changes |
+| `"Insurance"` | Insurance-related transactions |
+| `"Repossession"` | Repossession events |
+| `"Registration"` | Registration changes |
+
+> **Important:** Use `["None"]` (not `[]`) to retrieve all transaction types.
+
+## transtype (Response)
+
+In **response** records, `transtype` is a full descriptive string. These are different from the request category values.
+
+Examples of response values:
+- `"Full Sale - Retail to Retail"`
+- `"Full Sale - Retail to Wholesale"`
+- `"Lease - Operating Lease"`
+- `"Internal Sale - Corporate Restructure"`
+
+Do not use response `transtype` values in request payloads — they will not match.
+
+## Make Names
+
+Make names in the API are **all-caps strings**:
+
+| Value | Manufacturer |
+|-------|-------------|
+| `"GULFSTREAM"` | Gulfstream Aerospace |
+| `"BOMBARDIER"` | Bombardier Aviation |
+| `"DASSAULT"` | Dassault Aviation |
+| `"CESSNA"` | Cessna / Textron Aviation |
+| `"EMBRAER"` | Embraer |
+| `"BEECHCRAFT"` | Beechcraft / Textron Aviation |
+| `"PILATUS"` | Pilatus Aircraft |
+| `"AIRBUS"` | Airbus |
+| `"BOEING"` | Boeing |
+
+Use `getAircraftMakeList` to get the complete list of valid make names.
+
+---
+# SOURCE: docs/aircraft.md
+---
+
+# JETNET Aircraft Endpoints
+
+## Conceptual Model
+
+Aircraft endpoints cover the full lifecycle of a single aircraft record. JETNET models an aircraft as a **composite document** -- a root record (`getAircraft`) composed of independent sub-records that can be fetched individually or bundled together.
+
+```
+                    ┌──────────────┐
+                    │  getAircraft │  (full composite)
+                    └──────┬───────┘
+                           │
+    ┌──────────┬───────────┼───────────┬──────────┐
+    │          │           │           │          │
+┌───┴───┐ ┌───┴───┐ ┌─────┴─────┐ ┌──┴───┐ ┌───┴────┐
+│ Ident │ │Engine │ │ Avionics  │ │ Pics │ │Company │
+│       │ │       │ │ Features  │ │      │ │  Rels  │
+│Status │ │  APU  │ │ AddlEquip │ │Lease │ │        │
+│Airfrm │ │       │ │ Int / Ext │ │      │ │        │
+│ Maint │ │       │ │           │ │      │ │        │
+└───────┘ └───────┘ └───────────┘ └──────┘ └────────┘
+```
+
+You have three access patterns:
+
+| Pattern | When to Use | Endpoint |
+|---------|-------------|----------|
+| Full record | Need everything for one aircraft | `getAircraft` |
+| Sub-record | Need one section (e.g., engines only) | `getEngine`, `getAirframe`, etc. |
+| Quick lookup | Start from tail number or hex code | `getRegNumber`, `getHexNumber` |
+
+---
+
+## Endpoints
+
+| # | Endpoint | Method | Path | Response Key |
+|---|----------|--------|------|-------------|
+| 1 | getAircraft | GET | `/api/Aircraft/getAircraft/{id}/{apiToken}` | `aircraft` |
+| 2 | getIdentification | GET | `/api/Aircraft/getIdentification/{id}/{apiToken}` | `identification` |
+| 3 | getStatus | GET | `/api/Aircraft/getStatus/{id}/{apiToken}` | `status` |
+| 4 | getAirframe | GET | `/api/Aircraft/getAirframe/{id}/{apiToken}` | `airframe` |
+| 5 | getEngine | GET | `/api/Aircraft/getEngine/{id}/{apiToken}` | `engine` |
+| 6 | getApu | GET | `/api/Aircraft/getApu/{id}/{apiToken}` | `apu` |
+| 7 | getAvionics | GET | `/api/Aircraft/getAvionics/{id}/{apiToken}` | `avionics` |
+| 8 | getFeatures | GET | `/api/Aircraft/getFeatures/{id}/{apiToken}` | `features` |
+| 9 | getAdditionalEquipment | GET | `/api/Aircraft/getAdditionalEquipment/{id}/{apiToken}` | `additionalequipment` |
+| 10 | getInterior | GET | `/api/Aircraft/getInterior/{id}/{apiToken}` | `interior` |
+| 11 | getExterior | GET | `/api/Aircraft/getExterior/{id}/{apiToken}` | `exterior` |
+| 12 | getMaintenance | GET | `/api/Aircraft/getMaintenance/{id}/{apiToken}` | `maintenance` |
+| 13 | getLeases | GET | `/api/Aircraft/getLeases/{id}/{apiToken}` | `leases` |
+| 14 | getPictures | GET | `/api/Aircraft/getPictures/{id}/{apiToken}` | `pictures` |
+| 15 | getCompanyrelationships | GET | `/api/Aircraft/getCompanyrelationships/{id}/{apiToken}` | `companyrelationships` |
+| 16 | getFlights | GET | `/api/Aircraft/getFlights/{id}/{apiToken}` | `flightsummary` |
+| 17 | getRegNumber | GET | `/api/Aircraft/getRegNumber/{reg}/{apiToken}` | `aircraftresult` |
+| 18 | getHexNumber | GET | `/api/Aircraft/getHexNumber/{hex}/{apiToken}` | `aircraft` |
+| 19 | getAircraftList | POST | `/api/Aircraft/getAircraftList/{apiToken}` | `aircraft` |
+| 20 | getRelationships | POST | `/api/Aircraft/getRelationships/{apiToken}` | `relationships` |
+| 21 | getAllAircraftObjects | POST | `/api/Aircraft/getAllAircraftObjects/{apiToken}/{pagesize}/{page}` | `allaircraftobjects` |
+
+Endpoints with dedicated docs (not duplicated here):
+
+| Endpoint | See |
+|----------|-----|
+| getHistoryListPaged | [docs/history.md](history.md) |
+| getEventListPaged | [docs/events.md](events.md) |
+| getFlightDataPaged / getFlights | [docs/flight-data.md](flight-data.md) |
+| getBulkAircraftExportPaged | [docs/bulk-export.md](bulk-export.md) |
+| getCondensedOwnerOperatorsPaged | [docs/trends.md](trends.md) |
+| getCondensedSnapshot | [docs/snapshots.md](snapshots.md) |
+| getAcCompanyFractionalReportPaged | [docs/response-handling.md](response-handling.md) |
+| getAcSellerPurchaserReportPaged | [references/endpoints.md](../references/endpoints.md) |
+
+---
+
+## 1. getAircraft (Full Record)
+
+```
+GET /api/Aircraft/getAircraft/{id}/{apiToken}
+```
+
+Returns the complete aircraft record for a single `aircraftid`. This is the bundled composite -- it includes identification, status, airframe, engines, avionics, features, interior, exterior, maintenance, leases, pictures, and company relationships as nested objects.
+
+### Response Structure
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "aircraft": {
+    "identification": {
+      "aircraftid": 12345,
+      "modelid": 278,
+      "make": "Gulfstream Aerospace",
+      "model": "G550",
+      "sernbr": "5432",
+      "regnbr": "N550GD",
+      "yearmfr": 2014,
+      "yeardlv": 2015,
+      "actiondate": "2025-01-15T00:00:00",
+      "pageurl": "..."
+    },
+    "airframe": { ... },
+    "engine": { ... },
+    "apu": { ... },
+    "avionics": [ ... ],
+    "features": [ ... ],
+    "additionalequipment": [ ... ],
+    "interior": { ... },
+    "exterior": { ... },
+    "maintenance": { ... },
+    "leases": [ ... ],
+    "pictures": [ ... ],
+    "companyrelationships": [ ... ],
+    "status": { ... }
+  }
+}
+```
+
+### When to Use
+
+Use `getAircraft` when you need the full profile for a single aircraft. For targeted data (e.g., just engines or just maintenance), use the individual sub-record endpoints instead -- they return faster and consume less bandwidth.
+
+---
+
+## 2. getIdentification
+
+```
+GET /api/Aircraft/getIdentification/{id}/{apiToken}
+```
+
+Returns the identification header for an aircraft: make, model, registration, serial number, year manufactured, year delivered, and metadata.
+
+### Response Key
+
+`identification`
+
+### Key Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `aircraftid` | integer | Primary key |
+| `modelid` | integer | Model ID (AMODID) for `modlist` filters |
+| `make` | string | Manufacturer name |
+| `model` | string | Model designation |
+| `sernbr` | string | Manufacturer serial number |
+| `regnbr` | string | Registration / tail number |
+| `yearmfr` | integer | Year manufactured |
+| `yeardlv` | integer | Year delivered |
+| `actiondate` | string (ISO) | Last data update |
+| `pageurl` | string | JETNET web page URL |
+
+---
+
+## 3. getStatus
+
+```
+GET /api/Aircraft/getStatus/{id}/{apiToken}
+```
+
+Returns lifecycle and market status indicators: whether the aircraft is in operation, for sale, in storage, retired, etc.
+
+### Response Key
+
+`status`
+
+---
+
+## 4. getAirframe
+
+```
+GET /api/Aircraft/getAirframe/{id}/{apiToken}
+```
+
+Returns airframe time and landing metrics.
+
+### Response Key
+
+`airframe`
+
+### Key Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `aftt` | number | Airframe total time (hours) |
+| `landings` | number | Total landings |
+| `timesasofdate` | string (ISO) | Date when times were last reported |
+| `estaftt` | number | Estimated airframe total time |
+
+---
+
+## 5. getEngine
+
+```
+GET /api/Aircraft/getEngine/{id}/{apiToken}
+```
+
+Returns engine details including maintenance program enrollment and per-engine times.
+
+### Response Key
+
+`engine`
+
+### Response Structure
+
+The `engine` object contains top-level fields plus an `engines` array for per-engine data:
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "engine": {
+    "maintenanceprogram": "MSP Gold",
+    "model": "BR725",
+    "enginenoiserating": "Stage 4",
+    "engines": [
+      {
+        "sequencenumber": 1,
+        "serialnumber": "E-12345",
+        "timesincenew": 4500,
+        "tbo": 8000
+      },
+      {
+        "sequencenumber": 2,
+        "serialnumber": "E-12346",
+        "timesincenew": 4500,
+        "tbo": 8000
+      }
+    ]
+  }
+}
+```
+
+### Gotcha
+
+The response has two levels: the outer `engine` object (model-level data) and the inner `engines` array (per-engine data). Don't confuse `data["engine"]` with `data["engine"]["engines"]`.
+
+---
+
+## 6. getApu
+
+```
+GET /api/Aircraft/getApu/{id}/{apiToken}
+```
+
+Returns APU (Auxiliary Power Unit) details when available.
+
+### Response Key
+
+`apu` (object or `null`)
+
+### Null Handling
+
+Many aircraft have no APU data. When no APU exists:
+
+```json
+{
+  "responsestatus": "SUCCESS: NO RESULTS FOUND [APU]",
+  "apu": null
+}
+```
+
+Always check for `null` before accessing APU fields. Also note that `responsestatus` starts with `"SUCCESS"` even when no data is found -- use `.startsWith("SUCCESS")`, not strict equality.
+
+---
+
+## 7. getAvionics
+
+```
+GET /api/Aircraft/getAvionics/{id}/{apiToken}
+```
+
+Returns installed avionics packages.
+
+### Response Key
+
+`avionics` (array) + `count`
+
+### Response Structure
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "count": 3,
+  "avionics": [
+    { "name": "Collins Pro Line 21", "description": "Integrated avionics suite" },
+    { "name": "HUD/EVS", "description": "Head-up display with enhanced vision" }
+  ]
+}
+```
+
+---
+
+## 8. getFeatures
+
+```
+GET /api/Aircraft/getFeatures/{id}/{apiToken}
+```
+
+Returns aircraft feature list (cabin options, systems, modifications).
+
+### Response Key
+
+`features` (array) + `count`
+
+---
+
+## 9. getAdditionalEquipment
+
+```
+GET /api/Aircraft/getAdditionalEquipment/{id}/{apiToken}
+```
+
+Returns additional installed equipment, often free-text descriptions.
+
+### Response Key
+
+`additionalequipment` (array) + `count`
+
+### Response Structure
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "count": 2,
+  "additionalequipment": [
+    { "name": "WiFi", "description": "Gogo AVANCE L5 broadband with global coverage" },
+    { "name": "Satcom", "description": "Honeywell JetWave Ka-band satellite" }
+  ]
+}
+```
+
+---
+
+## 10. getInterior
+
+```
+GET /api/Aircraft/getInterior/{id}/{apiToken}
+```
+
+Returns interior configuration, cabin layout, and refurbishment notes.
+
+### Response Key
+
+`interior`
+
+---
+
+## 11. getExterior
+
+```
+GET /api/Aircraft/getExterior/{id}/{apiToken}
+```
+
+Returns paint scheme, exterior configuration, and repaint history.
+
+### Response Key
+
+`exterior`
+
+---
+
+## 12. getMaintenance
+
+```
+GET /api/Aircraft/getMaintenance/{id}/{apiToken}
+```
+
+Returns maintenance status, program enrollment, and coverage notes.
+
+### Response Key
+
+`maintenance`
+
+---
+
+## 13. getLeases
+
+```
+GET /api/Aircraft/getLeases/{id}/{apiToken}
+```
+
+Returns lease information when available.
+
+### Response Key
+
+`leases` (array or `null`)
+
+When no lease data exists, `leases` is `null` (not an empty array).
+
+---
+
+## 14. getPictures
+
+```
+GET /api/Aircraft/getPictures/{id}/{apiToken}
+```
+
+Returns image metadata and URLs for aircraft photos.
+
+### Response Key
+
+`pictures` (array) + `count`
+
+---
+
+## 15. getCompanyrelationships
+
+```
+GET /api/Aircraft/getCompanyrelationships/{id}/{apiToken}
+```
+
+Returns company relationship rows tied to a specific aircraft: owner, operator, manager, trustee, etc.
+
+### Response Key
+
+`companyrelationships` (array) + `count`
+
+### Key Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `companyid` | integer | Company ID |
+| `name` | string | Company name |
+| `relationtype` | string | Relationship type (Owner, Operator, Manager, Trustee, etc.) |
+| `relationseqno` | integer | Sequence number for ordering |
+| `contactid` | integer | Associated contact ID |
+| `ownerpercent` | number | Ownership percentage (for fractional) |
+| `fractionexpiresdate` | string | Fractional share expiration |
+| `isoperator` | string | `"Y"` or `"N"` -- **string, not boolean** |
+
+### Gotcha: `isoperator` Is a String
+
+```python
+# WRONG
+if rel["isoperator"]:  # always truthy -- "N" is truthy in Python
+
+# CORRECT
+if rel["isoperator"] == "Y":
+```
+
+### Difference from `getRelationships`
+
+`getCompanyrelationships` is a **GET** endpoint for a single aircraft by ID. `getRelationships` is a **POST** endpoint for batch queries across multiple aircraft. They return different response structures:
+
+| Endpoint | Method | Response Key | Use Case |
+|----------|--------|-------------|----------|
+| `getCompanyrelationships` | GET | `companyrelationships` | Single aircraft, flat records |
+| `getRelationships` | POST | `relationships` | Batch query, nested company/contact objects |
+
+---
+
+## 16. getFlights (Flight Summary)
+
+```
+GET /api/Aircraft/getFlights/{id}/{apiToken}
+```
+
+Returns aggregated monthly flight utilization for an aircraft. For per-flight detail records, use `getFlightDataPaged` instead.
+
+### Response Key
+
+`flightsummary`
+
+See [docs/flight-data.md](flight-data.md) for full documentation including the distinction between `getFlights` (summary) and `getFlightDataPaged` (detail).
+
+---
+
+## 17. getRegNumber (Tail Lookup)
+
+```
+GET /api/Aircraft/getRegNumber/{reg}/{apiToken}
+```
+
+Quick lookup by registration / tail number. This is the **entry point** for the Golden Path workflow.
+
+### Response Key
+
+`aircraftresult` (object)
+
+### Response Structure
+
+Returns a flat object with essential aircraft fields plus inline company relationships:
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "aircraftresult": {
+    "aircraftid": 12345,
+    "make": "Gulfstream Aerospace",
+    "model": "G550",
+    "modelid": 278,
+    "sernbr": "5432",
+    "regnbr": "N550GD",
+    "yearmfr": 2014,
+    "yeardlv": 2015,
+    "forsale": "N",
+    "marketstatus": "",
+    "asking": 0,
+    "companyrelationships": [
+      {
+        "companyid": 4425,
+        "companyname": "Acme Aviation LLC",
+        "companyrelation": "Owner",
+        "contactid": 343,
+        "contactfirstname": "William",
+        "contactlastname": "Butler"
+      }
+    ]
+  }
+}
+```
+
+### Schema Note
+
+`getRegNumber` uses a **flat schema** with `companyrelation` (not `relationtype`). This differs from `getRelationships` which uses a **nested schema** with `relationtype`. See [docs/response-handling.md](response-handling.md) for the full schema comparison.
+
+---
+
+## 18. getHexNumber (Hex Code Lookup)
+
+```
+GET /api/Aircraft/getHexNumber/{hex}/{apiToken}
+```
+
+Quick lookup by Mode S / ICAO hex code (e.g., `A12345`).
+
+### Response Key
+
+`aircraft` (object with essential fields)
+
+---
+
+## 19. getAircraftList (Fleet Search)
+
+```
+POST /api/Aircraft/getAircraftList/{apiToken}
+```
+
+Returns aircraft matching filters: model, lifecycle, for-sale status, geography, etc.
+
+### Request Body (`AcListOptions`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `modlist` | array of int | Model IDs to filter |
+| `forsale` | string | `"true"`, `"false"`, or `""` (all) |
+| `lifecycle` | string | `InOperation`, `Retired`, `InStorage`, etc. |
+| `basecountry` | string | Country filter |
+| `basecountrylist` | array | Multiple countries |
+| `basestate` | array | US state abbreviations |
+| `make` | string | Make filter |
+| `makelist` | array | Multiple makes |
+| `aclist` | array of int | Specific aircraft IDs |
+| `companyid` | integer | Filter by company |
+| `actiondate` | string | Changed-since date (MM/DD/YYYY) |
+| `enddate` | string | Changed-before date (MM/DD/YYYY) |
+| `aircraftchanges` | string | `"true"` for delta mode |
+| `sernbr` | string | Serial number filter |
+| `regnbr` | string | Registration filter |
+| `regnbrlist` | array | Multiple registration numbers |
+| `exactMatchReg` | boolean | Exact match on registration |
+| `showHistoricalAcRefs` | boolean | Include historical relationships |
+
+### Response Key
+
+`aircraft` (array) + `count`
+
+### Response Fields
+
+Each aircraft object includes: `aircraftid`, `make`, `model`, `modelid`, `icao`, `sernbr`, `regnbr`, `yearmfr`, `yeardlv`, `forsale`, `marketstatus`, `asking`, `pageurl`.
+
+### Gotcha: No Paged Variant
+
+Unlike most list endpoints, `getAircraftList` does **not** have a paged version. Use filters (`modlist`, geographic params, `forsale`) to control result size. For large datasets, use `getBulkAircraftExportPaged` instead.
+
+### Example
+
+```python
+body = {
+    "modlist": [278],
+    "forsale": "true",
+    "lifecycle": "InOperation",
+    "basecountrylist": ["United States"],
+    "aclist": [],
+    "airframetype": "None",
+    "maketype": "None"
+}
+resp = session.post(f"{BASE}/api/Aircraft/getAircraftList/{token}", json=body)
+aircraft = resp.json().get("aircraft", [])
+```
+
+```javascript
+const body = {
+  modlist: [278],
+  forsale: "true",
+  lifecycle: "InOperation",
+  basecountrylist: ["United States"],
+  aclist: [],
+  airframetype: "None",
+  maketype: "None"
+};
+const resp = await fetch(`${BASE}/api/Aircraft/getAircraftList/${TOKEN}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${BEARER}` },
+  body: JSON.stringify(body)
+});
+const { aircraft } = await resp.json();
+```
+
+---
+
+## 20. getRelationships (Batch)
+
+```
+POST /api/Aircraft/getRelationships/{apiToken}
+```
+
+Returns relationship records (owner, operator, manager, trustee, etc.) for aircraft matching filter criteria. Used for batch queries across multiple aircraft.
+
+### Request Body
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `aircraftid` | integer | Single aircraft ID |
+| `aclist` | array of int | List of aircraft IDs |
+| `modlist` | array of int | Model IDs |
+| `actiondate` | string | Changed-since date (MM/DD/YYYY) |
+| `showHistoricalAcRefs` | boolean | Include historical relationships |
+
+### Response Key
+
+`relationships` (array) + `count`
+
+### Nested Schema
+
+Each relationship record uses the nested schema with `company: {}` and `contact: {}` sub-objects:
+
+```json
+{
+  "relationships": [
+    {
+      "aircraftid": 12345,
+      "relationtype": "Owner",
+      "company": {
+        "companyid": 4425,
+        "name": "Acme Aviation LLC",
+        "city": "Dallas",
+        "state": "Texas",
+        "country": "United States"
+      },
+      "contact": {
+        "contactid": 343,
+        "firstname": "William",
+        "lastname": "Butler",
+        "title": "President"
+      }
+    }
+  ]
+}
+```
+
+### Best Practice
+
+Always include `aclist` with the aircraft IDs you want, even if you also set `aircraftid`:
+
+```python
+body = {
+    "aircraftid": 12345,
+    "aclist": [12345],
+    "modlist": [],
+    "actiondate": "",
+    "showHistoricalAcRefs": False
+}
+```
+
+---
+
+## 21. getAllAircraftObjects (Bulk Detail)
+
+```
+POST /api/Aircraft/getAllAircraftObjects/{apiToken}/{pagesize}/{page}
+```
+
+Paged retrieval of full aircraft object records. Requires an aircraft ID list -- sending an empty list returns an error.
+
+### Request Body
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `aclist` | array of int | **Required** -- aircraft IDs to retrieve |
+| `airframetype` | string | Airframe type filter |
+| `maketype` | string | Make type filter |
+| `sernbr` | string | Serial number filter |
+| `regnbr` | string | Registration filter |
+| `regnbrlist` | array | Registration number list |
+| `modelid` | integer | Model ID filter |
+| `make` | string | Make filter |
+
+### Response Key
+
+`allaircraftobjects` (array)
+
+### Error: Missing ID List
+
+```json
+{
+  "responsestatus": "ERROR: Aircraft ID List cannot be null or empty."
+}
+```
+
+---
+
+## Common Patterns
+
+### Sub-Record Fan-Out
+
+When you need specific sections for an aircraft, call the individual sub-record endpoints instead of `getAircraft`. This is especially useful when you only need one or two sections:
+
+```python
+aircraft_id = 12345
+
+engine_data = session.get(f"{BASE}/api/Aircraft/getEngine/{aircraft_id}/{token}").json()
+airframe_data = session.get(f"{BASE}/api/Aircraft/getAirframe/{aircraft_id}/{token}").json()
+
+engines = engine_data.get("engine", {})
+airframe = airframe_data.get("airframe", {})
+
+print(f"AFTT: {airframe.get('aftt')} hours")
+print(f"Engine program: {engines.get('maintenanceprogram')}")
+```
+
+```javascript
+const [engineResp, airframeResp] = await Promise.all([
+  fetch(`${BASE}/api/Aircraft/getEngine/${aircraftId}/${TOKEN}`),
+  fetch(`${BASE}/api/Aircraft/getAirframe/${aircraftId}/${TOKEN}`)
+]);
+
+const { engine } = await engineResp.json();
+const { airframe } = await airframeResp.json();
+
+console.log(`AFTT: ${airframe?.aftt} hours`);
+console.log(`Engine program: ${engine?.maintenanceprogram}`);
+```
+
+### Tail-to-Profile (Golden Path)
+
+The most common workflow starts with a tail number and builds a complete profile:
+
+```
+1. getRegNumber/{tail}/{apiToken}         → aircraftid, basic info
+2. getRelationships/{apiToken}            → owner, operator, manager
+   getPictures/{aircraftid}/{apiToken}    → photos (parallel with step 2)
+3. getHistoryListPaged/{apiToken}/100/1   → transaction history (lazy)
+```
+
+See the [Golden Path](../START_HERE.md) documentation for the full walkthrough.
+
+### Null Array Handling
+
+Several sub-record endpoints return `null` instead of `[]` when no data exists. Always use defensive access:
+
+```python
+avionics = resp.get("avionics") or []
+leases = resp.get("leases") or []
+pictures = resp.get("pictures") or []
+```
+
+```javascript
+const avionics = data.avionics ?? [];
+const leases = data.leases ?? [];
+const pictures = data.pictures ?? [];
+```
+
+---
+
+## Response Key Quick Reference
+
+| Endpoint | Response Key | Type | Notes |
+|----------|-------------|------|-------|
+| getAircraft | `aircraft` | Object | Composite with nested sub-records |
+| getIdentification | `identification` | Object | |
+| getStatus | `status` | Object | |
+| getAirframe | `airframe` | Object | `aftt`, `landings`, `timesasofdate` |
+| getEngine | `engine` | Object | Contains `engines[]` sub-array |
+| getApu | `apu` | Object or null | Check responsestatus for "NO RESULTS FOUND" |
+| getAvionics | `avionics` | Array | + `count` |
+| getFeatures | `features` | Array | + `count` |
+| getAdditionalEquipment | `additionalequipment` | Array | + `count` |
+| getInterior | `interior` | Object | |
+| getExterior | `exterior` | Object | |
+| getMaintenance | `maintenance` | Object | |
+| getLeases | `leases` | Array or null | null when no leases |
+| getPictures | `pictures` | Array | + `count` |
+| getCompanyrelationships | `companyrelationships` | Array | + `count`; `isoperator` is string |
+| getFlights | `flightsummary` | Object/Array | See flight-data.md |
+| getRegNumber | `aircraftresult` | Object | Flat schema with `companyrelation` |
+| getHexNumber | `aircraft` | Object | Essential fields |
+| getAircraftList | `aircraft` | Array | No paged variant |
+| getRelationships | `relationships` | Array | Nested schema with `relationtype` |
+| getAllAircraftObjects | `allaircraftobjects` | Array | Requires aclist |
+
+---
+# SOURCE: docs/flight-data.md
+---
+
+# JETNET Flight Data Integration
+
+## Endpoints Covered
+
+* `getFlightData` / `getFlightDataPaged` -- granular per-flight records
+* `getFlights` (Aircraft Flight Summary) -- aggregated monthly utilization
+
+---
+
+## Two Endpoints, Two Roles
+
+| Endpoint | Role | Data Level |
+|----------|------|------------|
+| **getFlightData** | Detailed, per-flight operational records | Transactional telemetry |
+| **getFlights** | Aggregated monthly utilization statistics | Pre-aggregated cache |
+
+```
+getFlightData  → detailed events
+        ↓ aggregation
+getFlights     → monthly summaries
+```
+
+| Question | Correct Endpoint |
+|----------|-----------------|
+| Where did aircraft fly? | getFlightData |
+| How active is aircraft monthly? | getFlights |
+| Build utilization trend? | getFlights |
+| Detect new travel patterns? | getFlightData |
+| Estimate emissions? | getFlightData |
+
+---
+
+## 1. getFlightData (Detail)
+
+### `POST /api/Aircraft/getFlightDataPaged/{apiToken}/{pagesize}/{page}`
+
+Returns granular flight-level records for aircraft matching filters. This is the primary activity dataset and should be treated as the authoritative operational feed.
+
+### Request Body
+
+```json
+{
+  "aircraftid": 0,
+  "airframetype": "None",
+  "sernbr": "",
+  "regnbr": "",
+  "maketype": "None",
+  "modelid": 0,
+  "make": "",
+  "origin": "",
+  "destination": "",
+  "startdate": "02/19/2026",
+  "enddate": "02/20/2026",
+  "aclist": [],
+  "modlist": [1194],
+  "exactMatchReg": true
+}
+```
+
+### Key Filters
+
+| Field | Behavior |
+|-------|----------|
+| `startdate / enddate` | **Required** for scalable queries. Use `MM/DD/YYYY` with leading zeros. |
+| `modlist` | Most efficient filter (model-based retrieval). Use AMODID values from `references/model-id-table.json`. |
+| `aclist` | Target specific aircraft IDs. Empty `[]` = no filter. |
+| `origin / destination` | Airport filtering (ICAO codes). |
+| `regnbr` | Tail-specific lookup. |
+| `exactMatchReg` | Set `true` to prevent fuzzy matching. |
+
+### Response Fields
+
+| Field | Meaning |
+|-------|---------|
+| `flightid` | Unique flight record ID |
+| `flightdate` | Flight occurrence date |
+| `origin_time` | Departure timing |
+| `flighttime` | Minutes flown |
+| `distance` | Flight distance |
+| `estfuelburn` | Estimated fuel usage |
+| `fuelburnrate` | Consumption rate |
+| `estCO2emissions` | Environmental impact metric |
+| `callsign` | Operational identifier |
+| `origin` / `destination` | Route endpoints (ICAO codes) |
+
+The response key is `flightdata` (array).
+
+### Engineering Notes
+
+- Model filtering (`modlist`) dramatically reduces payload size.
+- Date range must be constrained -- large queries without filters may exceed backend limits.
+- Response includes aircraft metadata + operational context (no extra joins required).
+- Flight data already includes sustainability metrics (fuel burn, CO2) -- no external calculation needed.
+
+---
+
+## 2. getFlights (Monthly Summary)
+
+### `GET /api/Aircraft/getFlights/{aircraftId}/{apiToken}`
+
+Returns aggregated monthly utilization totals for a single aircraft. This is **not** flight-level detail -- it is summarized analytics per month.
+
+### Response Example
+
+```json
+{
+  "flights": [
+    {
+      "flightyear": 2025,
+      "flightmonth": 2,
+      "flights": 103,
+      "flighthours": 240
+    }
+  ]
+}
+```
+
+### Response Fields
+
+| Field | Meaning |
+|-------|---------|
+| `flightyear` | Calendar year |
+| `flightmonth` | Month (1-12) |
+| `flights` | Number of flights in month |
+| `flighthours` | Total hours flown in month |
+
+This endpoint functions as a pre-aggregated utilization cache. It avoids needing to compute totals from raw flight records.
+
+---
+
+## 3. Ingestion Strategy
+
+### Recommended Approach
+
+```
+FOR each model (modlist)
+   FOR each day/week (date window)
+      call getFlightDataPaged
+```
+
+- Batch by model, not fleet-wide pulls.
+- Partition by date window (daily or weekly ingestion).
+- Use `getFlights` periodically to snapshot monthly totals without re-processing raw records.
+
+### Data Model
+
+```
+Aircraft
+ └── AircraftFlight
+        ├── flight_id
+        ├── date
+        ├── origin
+        ├── destination
+        ├── duration
+        ├── distance
+        ├── fuel_burn
+        └── co2_estimate
+
+AircraftMonthlyUsage (from getFlights)
+        ├── year
+        ├── month
+        ├── flight_count
+        └── hours_flown
+```
+
+---
+
+## 4. CRM & Analytics Signals
+
+### Derived Signals from Flight Data
+
+| Signal | Derived From |
+|--------|-------------|
+| Aircraft becoming active | Flight count increase (getFlights trend) |
+| Charter behavior | High route diversity (getFlightData origins/destinations) |
+| Ownership transition risk | Activity drop (getFlights trend) |
+| Sustainability scoring | CO2 + fuel burn (getFlightData estCO2emissions) |
+| FBO lead generation | Origin/destination patterns (getFlightData) |
+| Utilization benchmarking | Monthly hours vs fleet average (getFlights) |
+
+### Architecture
+
+1. **Discovery Layer** -- Use aircraft endpoints to identify target fleet
+2. **Activity Intelligence** -- Pull `getFlightData` in date-windowed batches, store normalized flight records
+3. **Utilization Snapshot** -- Periodically call `getFlights`, store as `AircraftMonthlyUsage` for CRM scoring
+4. **Derived Signals** -- Compute trends, detect behavioral changes, score leads
+
+---
+
+## 5. Key Takeaways
+
+1. `getFlightData` is the core intelligence endpoint -- detailed, per-flight, includes route + emissions.
+2. `getFlights` is an aggregation accelerator -- monthly totals without processing raw records.
+3. Always use `modlist` or `aclist` filters. Never pull unfiltered fleet-wide data.
+4. Always constrain date ranges. Daily or weekly windows are recommended.
+5. These endpoints together enable behavioral aviation analytics: activity scoring, travel pattern detection, sustainability tracking, and CRM automation.
+
+---
+# SOURCE: docs/bulk-export.md
 ---
 
 # JETNET Bulk Export Integration
@@ -1658,7 +3277,8 @@ Other bulk export quirks:
 
 See [Common Mistakes](common-mistakes.md) and [Pagination](pagination.md) for details on these quirks.
 
-
+---
+# SOURCE: docs/history.md
 ---
 
 # JETNET Aircraft History Endpoints
@@ -1985,7 +3605,8 @@ Poll periodically with a narrow date window to detect new transactions:
 - [Flight Data](flight-data.md) -- operational activity (complementary to transaction history)
 - [Common Mistakes](common-mistakes.md) -- known gotchas
 
-
+---
+# SOURCE: docs/snapshots.md
 ---
 
 # JETNET Aircraft Snapshot Endpoint
@@ -2225,7 +3846,8 @@ Dashboard / LLM Response
 - [Enum Reference](enum-reference.md) -- valid values for `airframetype`, `maketype`, `lifecycle`
 - [Response Handling](response-handling.md) -- schema differences across endpoints
 
-
+---
+# SOURCE: docs/trends.md
 ---
 
 # Market Trends & Time-Series Analytics
@@ -2477,7 +4099,8 @@ Plot `avg_airframe_time` trends against `avg_asking_price` from market trends. D
 - [Bulk Export](bulk-export.md) -- full aircraft data replication
 - [Response Handling](response-handling.md) -- schema differences across endpoints
 
-
+---
+# SOURCE: docs/events.md
 ---
 
 # JETNET Aircraft Events
@@ -2796,207 +4419,8 @@ Events complete the four-layer analytics architecture:
 - [Pagination](pagination.md) -- paged loop patterns
 - [Common Mistakes](common-mistakes.md) -- known gotchas including enum strictness
 
-
 ---
-
-# JETNET Flight Data Integration
-
-## Endpoints Covered
-
-* `getFlightData` / `getFlightDataPaged` -- granular per-flight records
-* `getFlights` (Aircraft Flight Summary) -- aggregated monthly utilization
-
----
-
-## Two Endpoints, Two Roles
-
-| Endpoint | Role | Data Level |
-|----------|------|------------|
-| **getFlightData** | Detailed, per-flight operational records | Transactional telemetry |
-| **getFlights** | Aggregated monthly utilization statistics | Pre-aggregated cache |
-
-```
-getFlightData  → detailed events
-        ↓ aggregation
-getFlights     → monthly summaries
-```
-
-| Question | Correct Endpoint |
-|----------|-----------------|
-| Where did aircraft fly? | getFlightData |
-| How active is aircraft monthly? | getFlights |
-| Build utilization trend? | getFlights |
-| Detect new travel patterns? | getFlightData |
-| Estimate emissions? | getFlightData |
-
----
-
-## 1. getFlightData (Detail)
-
-### `POST /api/Aircraft/getFlightDataPaged/{apiToken}/{pagesize}/{page}`
-
-Returns granular flight-level records for aircraft matching filters. This is the primary activity dataset and should be treated as the authoritative operational feed.
-
-### Request Body
-
-```json
-{
-  "aircraftid": 0,
-  "airframetype": "None",
-  "sernbr": "",
-  "regnbr": "",
-  "maketype": "None",
-  "modelid": 0,
-  "make": "",
-  "origin": "",
-  "destination": "",
-  "startdate": "02/19/2026",
-  "enddate": "02/20/2026",
-  "aclist": [],
-  "modlist": [1194],
-  "exactMatchReg": true
-}
-```
-
-### Key Filters
-
-| Field | Behavior |
-|-------|----------|
-| `startdate / enddate` | **Required** for scalable queries. Use `MM/DD/YYYY` with leading zeros. |
-| `modlist` | Most efficient filter (model-based retrieval). Use AMODID values from `references/model-id-table.json`. |
-| `aclist` | Target specific aircraft IDs. Empty `[]` = no filter. |
-| `origin / destination` | Airport filtering (ICAO codes). |
-| `regnbr` | Tail-specific lookup. |
-| `exactMatchReg` | Set `true` to prevent fuzzy matching. |
-
-### Response Fields
-
-| Field | Meaning |
-|-------|---------|
-| `flightid` | Unique flight record ID |
-| `flightdate` | Flight occurrence date |
-| `origin_time` | Departure timing |
-| `flighttime` | Minutes flown |
-| `distance` | Flight distance |
-| `estfuelburn` | Estimated fuel usage |
-| `fuelburnrate` | Consumption rate |
-| `estCO2emissions` | Environmental impact metric |
-| `callsign` | Operational identifier |
-| `origin` / `destination` | Route endpoints (ICAO codes) |
-
-The response key is `flightdata` (array).
-
-### Engineering Notes
-
-- Model filtering (`modlist`) dramatically reduces payload size.
-- Date range must be constrained -- large queries without filters may exceed backend limits.
-- Response includes aircraft metadata + operational context (no extra joins required).
-- Flight data already includes sustainability metrics (fuel burn, CO2) -- no external calculation needed.
-
----
-
-## 2. getFlights (Monthly Summary)
-
-### `GET /api/Aircraft/getFlights/{aircraftId}/{apiToken}`
-
-Returns aggregated monthly utilization totals for a single aircraft. This is **not** flight-level detail -- it is summarized analytics per month.
-
-### Response Example
-
-```json
-{
-  "flights": [
-    {
-      "flightyear": 2025,
-      "flightmonth": 2,
-      "flights": 103,
-      "flighthours": 240
-    }
-  ]
-}
-```
-
-### Response Fields
-
-| Field | Meaning |
-|-------|---------|
-| `flightyear` | Calendar year |
-| `flightmonth` | Month (1-12) |
-| `flights` | Number of flights in month |
-| `flighthours` | Total hours flown in month |
-
-This endpoint functions as a pre-aggregated utilization cache. It avoids needing to compute totals from raw flight records.
-
----
-
-## 3. Ingestion Strategy
-
-### Recommended Approach
-
-```
-FOR each model (modlist)
-   FOR each day/week (date window)
-      call getFlightDataPaged
-```
-
-- Batch by model, not fleet-wide pulls.
-- Partition by date window (daily or weekly ingestion).
-- Use `getFlights` periodically to snapshot monthly totals without re-processing raw records.
-
-### Data Model
-
-```
-Aircraft
- └── AircraftFlight
-        ├── flight_id
-        ├── date
-        ├── origin
-        ├── destination
-        ├── duration
-        ├── distance
-        ├── fuel_burn
-        └── co2_estimate
-
-AircraftMonthlyUsage (from getFlights)
-        ├── year
-        ├── month
-        ├── flight_count
-        └── hours_flown
-```
-
----
-
-## 4. CRM & Analytics Signals
-
-### Derived Signals from Flight Data
-
-| Signal | Derived From |
-|--------|-------------|
-| Aircraft becoming active | Flight count increase (getFlights trend) |
-| Charter behavior | High route diversity (getFlightData origins/destinations) |
-| Ownership transition risk | Activity drop (getFlights trend) |
-| Sustainability scoring | CO2 + fuel burn (getFlightData estCO2emissions) |
-| FBO lead generation | Origin/destination patterns (getFlightData) |
-| Utilization benchmarking | Monthly hours vs fleet average (getFlights) |
-
-### Architecture
-
-1. **Discovery Layer** -- Use aircraft endpoints to identify target fleet
-2. **Activity Intelligence** -- Pull `getFlightData` in date-windowed batches, store normalized flight records
-3. **Utilization Snapshot** -- Periodically call `getFlights`, store as `AircraftMonthlyUsage` for CRM scoring
-4. **Derived Signals** -- Compute trends, detect behavioral changes, score leads
-
----
-
-## 5. Key Takeaways
-
-1. `getFlightData` is the core intelligence endpoint -- detailed, per-flight, includes route + emissions.
-2. `getFlights` is an aggregation accelerator -- monthly totals without processing raw records.
-3. Always use `modlist` or `aclist` filters. Never pull unfiltered fleet-wide data.
-4. Always constrain date ranges. Daily or weekly windows are recommended.
-5. These endpoints together enable behavioral aviation analytics: activity scoring, travel pattern detection, sustainability tracking, and CRM automation.
-
-
+# SOURCE: docs/contacts.md
 ---
 
 # Contacts
@@ -3328,7 +4752,8 @@ Use `actiondate` in `getContactListPaged` to pull only contacts that changed sin
 - [Pagination](pagination.md) — standard paging pattern for `getContactListPaged`
 - [Companies](companies.md) — company endpoints that connect to contacts via `companyid`
 
-
+---
+# SOURCE: docs/companies.md
 ---
 
 # JETNET Company Endpoints
@@ -3863,7 +5288,8 @@ Even when a valid ownership relationship exists, `ownerpercent` may be `null`. D
 - [Pagination](pagination.md) — Paged loop patterns and `maxpages: 0` quirk
 - [Common Mistakes](common-mistakes.md) — Known gotchas including null arrays and string booleans
 
-
+---
+# SOURCE: docs/model-data.md
 ---
 
 # Model Data Endpoints
@@ -4126,7 +5552,8 @@ Query all three endpoints with the same `modlist` to build a complete model prof
 - [Response Handling](response-handling.md) -- general response structure guidance
 - [Utility Endpoints](utility-endpoints.md) -- `getAircraftModelList` for runtime model lookup
 
-
+---
+# SOURCE: docs/airports.md
 ---
 
 # Airports
@@ -4318,7 +5745,8 @@ Airport data changes very infrequently. Recommended approach:
 - [Trends](trends.md) -- market analytics that can be aggregated by region
 - [Utility Endpoints](utility-endpoints.md) -- other reference/dimension endpoints
 
-
+---
+# SOURCE: docs/utility-endpoints.md
 ---
 
 # Utility & Reference Endpoints
@@ -4850,1530 +6278,8 @@ Without the utility layer:
 - [Common Mistakes](common-mistakes.md) -- gotchas including enum strictness
 - [Airports](airports.md) -- `getAirportList` (also in Utility namespace)
 
-
 ---
-
-# Common Mistakes
-
-## Authentication
-
-### `emailAddress` has a capital A
-
-The login field is `emailAddress` — not `email`, `emailaddress`, or `email_address`. This is the single most common auth mistake.
-
-```json
-// Wrong
-{ "email": "user@example.com", "password": "..." }
-{ "emailaddress": "user@example.com", "password": "..." }
-
-// Correct
-{ "emailAddress": "user@example.com", "password": "..." }
-```
-
-### `apiToken` goes in the URL path only
-
-The `apiToken` is placed in the URL path — never in headers or the JSON body.
-
-```
-// Wrong
-Authorization: Bearer {bearerToken} {apiToken}
-{ "apiToken": "abc123", ... }
-
-// Correct
-GET /api/Aircraft/getRegNumber/N123AB/{apiToken}
-Authorization: Bearer {bearerToken}
-```
-
-## Response Handling
-
-### HTTP 200 does not mean success
-
-JETNET returns HTTP 200 for most responses, including errors. Always check `responsestatus`:
-
-```python
-result = r.json()
-if "ERROR" in result.get("responsestatus", "").upper():
-    raise ValueError(f"JETNET error: {result['responsestatus']}")
-```
-
-### `companyrelation` vs `relationtype`
-
-Different endpoints use different field names for the relationship type. Using the wrong field returns nothing:
-
-| Endpoint | Field Name |
-|----------|-----------|
-| `getRegNumber` | `companyrelation` |
-| `getHistoryList` / `getRelationships` | `relationtype` |
-| `getBulkAircraftExport` | Field prefix (`owr*`, `opr*`, `chp*`) |
-| `getAcCompanyFractionalReportPaged` | `relation` |
-
-See [Response Handling](response-handling.md) for the full schema comparison.
-
-### `"SUCCESS: NO RESULTS FOUND"` is a normal response
-
-Several endpoints return `responsestatus` values like `"SUCCESS: NO RESULTS FOUND [PHONE NUMBERS]"` when a query matches zero records. This is **not an error** — it is a valid business state. Use a prefix check, not strict equality:
-
-```python
-# Wrong — breaks on "SUCCESS: NO RESULTS FOUND [...]"
-if result["responsestatus"] != "SUCCESS":
-    raise ValueError("Request failed")
-
-# Correct — treats any SUCCESS prefix as OK
-if not result.get("responsestatus", "").upper().startswith("SUCCESS"):
-    raise ValueError(f"JETNET error: {result['responsestatus']}")
-```
-
-```javascript
-// Wrong
-if (data.responsestatus !== "SUCCESS") throw new Error("Failed");
-
-// Correct
-if (!(data.responsestatus || "").toUpperCase().startsWith("SUCCESS")) {
-  throw new Error(`JETNET error: ${data.responsestatus}`);
-}
-```
-
-### Null arrays — guard before iterating
-
-Fields like `phonenumbers`, `relatedcompanies`, and `companycertifications` return `null` (not `[]`) when empty. Any code calling `.map()` or `.forEach()` without a guard will crash:
-
-```python
-# Wrong — TypeError if phonenumbers is None
-for p in result["phonenumbers"]:
-    print(p)
-
-# Correct
-for p in result.get("phonenumbers") or []:
-    print(p)
-```
-
-```javascript
-// Wrong — Cannot read properties of null
-data.phonenumbers.map(p => p.number);
-
-// Correct
-(data.phonenumbers ?? []).map(p => p.number);
-```
-
-### `isoperator` is a `"Y"` / `"N"` string
-
-In relationship data, `isoperator` is a string, not a boolean:
-
-```python
-# Wrong — always truthy because "N" is a non-empty string
-if record["isoperator"]:
-
-# Correct
-if record["isoperator"] == "Y":
-```
-
-## URL Shape Variations
-
-### Mixed URL patterns across endpoints
-
-JETNET endpoints use three different URL patterns. Trying to build all paths with a single template will break:
-
-```
-# Pattern 1: POST body + token only
-POST /api/Contact/getContactList/{apiToken}
-
-# Pattern 2: Resource ID + token
-GET /api/Contact/getContact/{contactId}/{apiToken}
-
-# Pattern 3: Token + pagination in path
-POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pageSize}/{page}
-```
-
-Build your URL helper to accept optional `id`, `pageSize`, and `page` parameters rather than assuming one shape fits all.
-
-## Response key changes between paged and non-paged variants
-
-The non-paged and paged versions of the same search endpoint use **different response keys**:
-
-| Endpoint (non-paged) | Response key | Endpoint (paged) | Response key |
-|----------------------|-------------|------------------|-------------|
-| `getContactList` | `contacts` | `getContactListPaged` | `contactlist` |
-| `getCompanyList` | `companies` | `getCompanyListPaged` | `companylist` |
-
-Non-paged endpoints also return `currentpage: 0` and `maxpages: 0` — do **not** interpret these as paging metadata.
-
-```python
-# Wrong — assumes same key for both variants
-data = response.json()
-records = data["contacts"]  # works for non-paged, breaks for paged
-
-# Correct — use the right key per variant
-if is_paged:
-    records = data["contactlist"]
-else:
-    records = data["contacts"]
-```
-
-## N+1 and Fan-Out Risks
-
-### Company → Contacts returns ID arrays, not full objects
-
-`getContacts` (`/api/Company/getContacts/{companyId}/{apiToken}`) returns contact IDs as a plain array — not hydrated contact objects:
-
-```json
-{ "contacts": [523097, 282591, 198443] }
-```
-
-To get full contact data, you must call `getContact` or `getIdentification` for **each** ID. This creates an N+1 fan-out problem. Mitigate with concurrency limits:
-
-```python
-import asyncio
-
-sem = asyncio.Semaphore(5)
-
-async def fetch_contact(session, contact_id):
-    async with sem:
-        return await session.get(f".../getContact/{contact_id}/{token}")
-
-tasks = [fetch_contact(session, cid) for cid in contact_ids]
-contacts = await asyncio.gather(*tasks)
-```
-
-```javascript
-// Limit concurrency to 5 at a time
-const pLimit = (await import("p-limit")).default;
-const limit = pLimit(5);
-
-const contacts = await Promise.all(
-  contactIds.map(id => limit(() => fetchContact(id)))
-);
-```
-
-### `ownerpercent` can be null even when relationship exists
-
-Do not assume `ownerpercent` or `fractionexpiresdate` are always populated on ownership/fractional relationships. Always provide a fallback:
-
-```python
-pct = record.get("ownerpercent") or "0.00"
-```
-
-## Filters and Payloads
-
-### Empty `aclist: []` means no filter, not empty results
-
-Sending `"aclist": []` does not return zero results — it removes the aircraft filter entirely, returning all matching records. Be intentional:
-
-```json
-// Returns ALL aircraft (no filter)
-{ "aclist": [], "modlist": [] }
-
-// Returns only these specific aircraft
-{ "aclist": [128228, 242781], "modlist": [] }
-```
-
-### `transtype: ["None"]` not `[]` for all history types
-
-To get all transaction types in history queries, send `["None"]` — not an empty array:
-
-```json
-// Wrong — may not return all types
-{ "transtype": [] }
-
-// Correct — returns all transaction types
-{ "transtype": ["None"] }
-```
-
-## Date Formatting
-
-### Use `MM/DD/YYYY` with leading zeros
-
-JETNET requires `MM/DD/YYYY` format with leading zeros:
-
-```json
-// Wrong
-{ "startdate": "1/1/2024" }
-
-// Correct
-{ "startdate": "01/01/2024" }
-```
-
-### `getBulkAircraftExport` accepts datetime strings
-
-The `actiondate` and `enddate` fields accept full datetime strings for hourly polling windows:
-
-```json
-{ "actiondate": "02/26/2026 10:00:00", "enddate": "02/26/2026 11:00:00" }
-```
-
-## String Booleans
-
-### `forsale` in responses is a string
-
-In most endpoints, `forsale` is `"true"` or `"false"` (strings), not JSON booleans:
-
-```python
-# Wrong
-if record["forsale"]:  # Always truthy because it's a non-empty string
-
-# Correct
-if record["forsale"] == "true":
-```
-
-### `getBulkAircraftExport` uses `"Y"` / `"N"` for forsale
-
-The bulk export endpoint uses a different convention:
-
-```python
-# In getBulkAircraftExport
-if record["forsale"] == "Y":
-```
-
-### `datepurchased` format differs in bulk export
-
-In `getBulkAircraftExport`, `datepurchased` is `YYYYMMDD` format (not `MM/DD/YYYY`).
-
-## Endpoint-Specific Issues
-
-### `getAircraftList` has no paged variant
-
-Unlike most list endpoints, `getAircraftList` does not have a paged version. Use filters (`modlist`, geographic params, `forsale`) to control result size.
-
-### `getEventList` enum values are strict
-
-Sending unrecognized enum values to `getEventList` produces an `ERROR` in `responsestatus` despite HTTP 200. Use `getEventTypes` and `getEventCategories` to get valid values first.
-
-### `getBulkAircraftExport` returns `maxpages: 0` for single-page results
-
-When all results fit in one call, the response has `maxpages: 0` and `currentpage: 0`. Use `max(maxpages, 1)` in your loop or you will exit immediately and miss all records:
-
-```python
-if page >= max(data.get("maxpages", 1), 1):
-    break
-```
-
-### `getAcCompanyFractionalReportPaged` response key
-
-The response key is `aircraftcompfractionalrefs`. Each row is one relationship per aircraft:
-
-- `fractionPercentOwned: "100.00"` = actual owner
-- `fractionPercentOwned: "0.00"` = operator/manager on same aircraft
-- The `relationship` filter is an array: `["Fractional Owner"]`
-
-## Field Name Gotchas
-
-### `getRegNumber` flat companyrelationships
-
-The flat schema uses `companyrelation` and prefixed fields (`companyname`, `contactfirstname`). For FBO ramp contact lookup, filter on `contacttitle` for Chief Pilot, Director of Aviation, Scheduler, or Dispatcher.
-
-### `getBulkAircraftExport` flat prefixed schema
-
-Role-prefixed fields: `owr*` = owner, `opr*` = operator, `chp*` = chief pilot, `excbrk1*`/`excbrk2*` = brokers, `addl1-3*` = additional. This is not the same schema as `getRegNumber` or `getRelationships`.
-
-
----
-
-# Enum Reference
-
-## airframetype
-
-Filters by aircraft airframe category.
-
-| Value | Description |
-|-------|-------------|
-| `None` | No filter (all airframe types) |
-| `FixedWing` | Fixed-wing aircraft |
-| `Rotary` | Rotorcraft (helicopters) |
-
-## maketype
-
-Filters by aircraft propulsion/category.
-
-| Value | Description |
-|-------|-------------|
-| `None` | No filter (all make types) |
-| `JetAirliner` | Commercial jet airliners |
-| `BusinessJet` | Business jets |
-| `Turboprop` | Turboprop aircraft |
-| `Piston` | Piston-engine aircraft |
-| `Turbine` | Turbine-powered (helicopters) |
-
-## lifecycle
-
-Filters by aircraft operational status.
-
-| Value | Description |
-|-------|-------------|
-| `None` | No filter (all lifecycle stages) |
-| `InProduction` | Currently being manufactured |
-| `NewWithManufacturer` | Completed but not yet delivered |
-| `InOperation` | Active and in service |
-| `Retired` | Permanently out of service |
-| `InStorage` | Temporarily inactive / stored |
-
-## forsale (Request)
-
-Filters by for-sale status in request payloads. These are **string values**, not booleans.
-
-| Value | Description |
-|-------|-------------|
-| `"true"` | Only aircraft listed for sale |
-| `"false"` | Only aircraft not listed for sale |
-| `""` | No filter (all aircraft) |
-
-> **Note:** In `getBulkAircraftExport` responses, `forsale` uses `"Y"` / `"N"` instead.
-
-## isnewaircraft / ispreownedtrans / isinternaltrans
-
-Three-state filters used in history and transaction queries.
-
-| Value | Description |
-|-------|-------------|
-| `"Yes"` | Include only matching records |
-| `"No"` | Exclude matching records |
-| `"Ignore"` | No filter on this field |
-
-## transtype (Request)
-
-Transaction type categories used in history list request payloads. These are **category labels**, not the full descriptive strings returned in responses.
-
-| Value | Description |
-|-------|-------------|
-| `"None"` | All transaction types (no filter) |
-| `"FullSale"` | Full sale transactions |
-| `"Lease"` | Lease transactions |
-| `"InternalSale"` | Internal/corporate transfers |
-| `"Management"` | Management changes |
-| `"Insurance"` | Insurance-related transactions |
-| `"Repossession"` | Repossession events |
-| `"Registration"` | Registration changes |
-
-> **Important:** Use `["None"]` (not `[]`) to retrieve all transaction types.
-
-## transtype (Response)
-
-In **response** records, `transtype` is a full descriptive string. These are different from the request category values.
-
-Examples of response values:
-- `"Full Sale - Retail to Retail"`
-- `"Full Sale - Retail to Wholesale"`
-- `"Lease - Operating Lease"`
-- `"Internal Sale - Corporate Restructure"`
-
-Do not use response `transtype` values in request payloads — they will not match.
-
-## Make Names
-
-Make names in the API are **all-caps strings**:
-
-| Value | Manufacturer |
-|-------|-------------|
-| `"GULFSTREAM"` | Gulfstream Aerospace |
-| `"BOMBARDIER"` | Bombardier Aviation |
-| `"DASSAULT"` | Dassault Aviation |
-| `"CESSNA"` | Cessna / Textron Aviation |
-| `"EMBRAER"` | Embraer |
-| `"BEECHCRAFT"` | Beechcraft / Textron Aviation |
-| `"PILATUS"` | Pilatus Aircraft |
-| `"AIRBUS"` | Airbus |
-| `"BOEING"` | Boeing |
-
-Use `getAircraftMakeList` to get the complete list of valid make names.
-
-
----
-
-# JETNET API -- Full Endpoint Reference
-This file contains every endpoint with its parameters.
-Date parameters use `MM/DD/YYYY` format unless noted.
-
-## Admin
-
-### `POST` /api/Admin/APILogin
-**Customer APILogin**
-
-**Request body** (`ApiUser`):
-- `emailAddress` (string, capital A) -- ApiUser EmailAddress
-- `password` (string) -- ApiUser Password
-
----
-
-### `GET` /api/Admin/getBearerToken
-**Get Bearer Token**
-
----
-
-## Aircraft
-
-### `GET` /api/Aircraft/getAircraft/{id}/{securityToken}
-**Get ALL Aircraft data**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getIdentification/{id}/{securityToken}
-**Get Aircraft Identification**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getStatus/{id}/{securityToken}
-**Get Aircraft Status**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getAirframe/{id}/{securityToken}
-**Get Aircraft Airframe**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getEngine/{id}/{securityToken}
-**Get Aircraft Engines**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getApu/{id}/{securityToken}
-**Get Aircraft APU**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getCompanyrelationships/{id}/{securityToken}
-**Get Aircraft Company Relationships**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getMaintenance/{id}/{securityToken}
-**Get Aircraft Maintenance**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getAvionics/{id}/{securityToken}
-**Get Aircraft Avionics**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getFeatures/{id}/{securityToken}
-**Get Aircraft Features**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getAdditionalEquipment/{id}/{securityToken}
-**Get Aircraft Additional Equipment**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getInterior/{id}/{securityToken}
-**Get Aircraft Interior**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getExterior/{id}/{securityToken}
-**Get Aircraft Exterior**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getLeases/{id}/{securityToken}
-**Get Aircraft Leases**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getFlights/{id}/{securityToken}
-**Get Aircraft Flight Summary**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getPictures/{id}/{securityToken}
-**Get Aircraft Pictures**
-
-**Path params:**
-- `id`: Aircraft ID (required)
-
----
-
-### `GET` /api/Aircraft/getRegNumber/{reg}/{securityToken}
-**Get simple aircraft info by tail number**
-
-**Path params:**
-- `reg`: Registration Number (required)
-
----
-
-### `GET` /api/Aircraft/getHexNumber/{hex}/{securityToken}
-**Get simple aircraft info by hexcode number**
-
-**Path params:**
-- `hex`: Hexcode Number (required)
-
----
-
-### `POST` /api/Aircraft/getAircraftList/{securityToken}
-**Get Aircraft List**
-
-**Request body** (`AcListOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `showHistoricalAcRefs` (boolean)
-- `showAwaitingDocsCompanies` (boolean)
-
----
-
-### `POST` /api/Aircraft/getEventList/{securityToken}
-**Get Aircraft Events**
-
-**Request body** (`AcEventsOptions`):
-- `aircraftid` (integer)
-- `modelid` (integer)
-- `make` (string)
-- `evcategory` (array)
-- `evtype` (array)
-- `startdate` (string)
-- `enddate` (string)
-- `aclist` (array)
-- `modlist` (array)
-
----
-
-### `POST` /api/Aircraft/getEventListPaged/{securityToken}/{pagesize}/{page}
-**Get Aircraft Events Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AcEventsOptions`):
-- `aircraftid` (integer)
-- `modelid` (integer)
-- `make` (string)
-- `evcategory` (array)
-- `evtype` (array)
-- `startdate` (string)
-- `enddate` (string)
-- `aclist` (array)
-- `modlist` (array)
-
----
-
-### `POST` /api/Aircraft/getHistoryList/{securityToken}
-**Get Aircraft History**
-
-**Request body** (`AcHistoryOptions`):
-- `aircraftid` (integer)
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `modelid` (integer)
-- `make` (string)
-- `companyid` (integer)
-- `isnewaircraft` (eYesNoIgnoreFlag)
-- `allrelationships` (boolean)
-- `transtype` (array)
-- `startdate` (string)
-- `enddate` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `lastactionstartdate` (string)
-- `lastactionenddate` (string)
-- `ispreownedtrans` (eYesNoIgnoreFlag)
-- `isretailtrans` (eYesNoIgnoreFlag)
-- `isinternaltrans` (eYesNoIgnoreFlag)
-
----
-
-### `POST` /api/Aircraft/getHistoryListPaged/{securityToken}/{pagesize}/{page}
-**Get Aircraft History Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AcHistoryOptions`):
-- `aircraftid` (integer)
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `modelid` (integer)
-- `make` (string)
-- `companyid` (integer)
-- `isnewaircraft` (eYesNoIgnoreFlag)
-- `allrelationships` (boolean)
-- `transtype` (array)
-- `startdate` (string)
-- `enddate` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `lastactionstartdate` (string)
-- `lastactionenddate` (string)
-- `ispreownedtrans` (eYesNoIgnoreFlag)
-- `isretailtrans` (eYesNoIgnoreFlag)
-- `isinternaltrans` (eYesNoIgnoreFlag)
-
----
-
-### `POST` /api/Aircraft/getRelationships/{securityToken}
-**Get Aircraft Relationships**
-
-**Request body** (`AcRelationshipOptions`):
-- `aircraftid` (integer)
-- `aclist` (array)
-- `modlist` (array)
-- `actiondate` (string)
-- `showHistoricalAcRefs` (boolean)
-
----
-
-### `POST` /api/Aircraft/getFlightData/{securityToken}
-**Get Aircraft Flight Data**
-
-**Request body** (`AcFlightDataOptions`):
-- `aircraftid` (integer)
-- `airframetype` (eAirFrameTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `maketype` (eMakeTypes)
-- `modelid` (integer)
-- `make` (string)
-- `origin` (string)
-- `destination` (string)
-- `startdate` (string)
-- `enddate` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `lastactionstartdate` (string)
-- `lastactionenddate` (string)
-- `exactMatchReg` (boolean)
-
----
-
-### `POST` /api/Aircraft/getFlightDataPaged/{securityToken}/{pagesize}/{page}
-**Get Aircraft Flight Data Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AcFlightDataOptions`):
-- `aircraftid` (integer)
-- `airframetype` (eAirFrameTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `maketype` (eMakeTypes)
-- `modelid` (integer)
-- `make` (string)
-- `origin` (string)
-- `destination` (string)
-- `startdate` (string)
-- `enddate` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `lastactionstartdate` (string)
-- `lastactionenddate` (string)
-- `exactMatchReg` (boolean)
-
----
-
-### `POST` /api/Aircraft/getCondensedOwnerOperators/{securityToken}
-**Get Aircraft Condensed Owner / Operators List**
-
-**Request body** (`AcListOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `showHistoricalAcRefs` (boolean)
-- `showAwaitingDocsCompanies` (boolean)
-
----
-
-### `POST` /api/Aircraft/getCondensedOwnerOperatorsPaged/{securityToken}/{pagesize}/{page}
-**Get Aircraft Condensed Owner / Operators List Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AcListOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `showHistoricalAcRefs` (boolean)
-- `showAwaitingDocsCompanies` (boolean)
-
----
-
-### `POST` /api/Aircraft/getCondensedSnapshot/{securityToken}
-**Get Aircraft Condensed Owner / Operators Historical Snapshot**
-
-**Request body** (`AcSnapshotOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `snapshotdate` (string)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-
----
-
-### `POST` /api/Aircraft/getAcCompanyFractionalReport/{securityToken}
-**Get Aircraft Fractional Info**
-
-**Request body** (`AircraftReportOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `fractionexpiresdate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `bustype` (array)
-- `relationship` (array)
-- `ownertype` (array)
-
----
-
-### `POST` /api/Aircraft/getAcCompanyFractionalReportPaged/{securityToken}/{pagesize}/{page}
-**Get Aircraft Fractional Info Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AircraftReportOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `fractionexpiresdate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `bustype` (array)
-- `relationship` (array)
-- `ownertype` (array)
-
----
-
-### `POST` /api/Aircraft/getAcSellerPurchaserReport/{securityToken}
-**Get Aircraft Seller Purchaser Report**
-
-**Request body** (`AircraftReportOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `fractionexpiresdate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `bustype` (array)
-- `relationship` (array)
-- `ownertype` (array)
-
----
-
-### `POST` /api/Aircraft/getAcSellerPurchaserReportPaged/{securityToken}/{pagesize}/{page}
-**Get Aircraft Seller Purchaser Report Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AircraftReportOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `fractionexpiresdate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `bustype` (array)
-- `relationship` (array)
-- `ownertype` (array)
-
----
-
-### `POST` /api/Aircraft/getBulkAircraftExport/{securityToken}
-**Get Bulk Export of Aircraft Record Lists**
-
-**Request body** (`AcListOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `showHistoricalAcRefs` (boolean)
-- `showAwaitingDocsCompanies` (boolean)
-
----
-
-### `POST` /api/Aircraft/getBulkAircraftExportPaged/{securityToken}/{pagesize}/{page}
-**Get Bulk Export of Aircraft Record Lists Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AcListOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `sernbr` (string)
-- `regnbr` (string)
-- `regnbrlist` (array)
-- `modelid` (integer)
-- `make` (string)
-- `makelist` (array)
-- `forsale` (string)
-- `lifecycle` (eLifeCycle)
-- `basestate` (array)
-- `basestatename` (array)
-- `basecountry` (string)
-- `basecountrylist` (array)
-- `basecode` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `companyid` (integer)
-- `complist` (array)
-- `contactid` (integer)
-- `yearmfr` (integer)
-- `yeardlv` (integer)
-- `aircraftchanges` (string)
-- `aclist` (array)
-- `modlist` (array)
-- `exactMatchReg` (boolean)
-- `showHistoricalAcRefs` (boolean)
-- `showAwaitingDocsCompanies` (boolean)
-
----
-
-### `POST` /api/Aircraft/getAllAircraftObjects/{securityToken}/{pagesize}/{page}
-**Get ALL Aircraft Object Data **
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`AcObjectListOptions`):
-- `aclist` (array)
-
----
-
-## Company
-
-### `GET` /api/Company/getCompany/{id}/{securityToken}
-**Get ALL Company data**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getIdentification/{id}/{securityToken}
-**Get Identification**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getContacts/{id}/{securityToken}
-**Get Contacts**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getPhonenumbers/{id}/{securityToken}
-**Get Phone Numbers**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getBusinesstypes/{id}/{securityToken}
-**Get Business Types**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getAircraftrelationships/{id}/{securityToken}
-**Get Aircraft Relationships**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getRelatedcompanies/{id}/{securityToken}
-**Get Related Companies**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `GET` /api/Company/getCompanyCertifications/{id}/{securityToken}
-**Get Company Certifications**
-
-**Path params:**
-- `id`: Company ID (required)
-
----
-
-### `POST` /api/Company/getCompanyList/{securityToken}
-**Get Company List**
-
-**Request body** (`CompListOptions`):
-- `aircraftid` (array)
-- `name` (string)
-- `country` (string)
-- `city` (string)
-- `state` (array)
-- `statename` (array)
-- `bustype` (array)
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `modelid` (array)
-- `make` (array)
-- `relationship` (array)
-- `isoperator` (string)
-- `actiondate` (string)
-- `companychanges` (string)
-- `website` (string)
-- `complist` (array)
-
----
-
-### `POST` /api/Company/getCompanyListPaged/{securityToken}/{pagesize}/{page}
-**Get Company List Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`CompListOptions`):
-- `aircraftid` (array)
-- `name` (string)
-- `country` (string)
-- `city` (string)
-- `state` (array)
-- `statename` (array)
-- `bustype` (array)
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `modelid` (array)
-- `make` (array)
-- `relationship` (array)
-- `isoperator` (string)
-- `actiondate` (string)
-- `companychanges` (string)
-- `website` (string)
-- `complist` (array)
-
----
-
-### `POST` /api/Company/getCompanyHistory/{securityToken}
-**Get Company History List**
-
-**Request body** (`CompHistoryOptions`):
-- `companyid` (integer)
-- `complist` (array)
-- `aircraftid` (integer)
-- `aclist` (array)
-- `transtype` (array)
-- `relationship` (array)
-- `startdate` (string)
-- `enddate` (string)
-- `lastactionstartdate` (string)
-- `lastactionenddate` (string)
-- `isinternaltrans` (eYesNoIgnoreFlag)
-- `isoperator` (eYesNoIgnoreFlag)
-
----
-
-### `POST` /api/Company/getCompanyHistoryPaged/{securityToken}/{pagesize}/{page}
-**Get Company History List Paged**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`CompHistoryOptions`):
-- `companyid` (integer)
-- `complist` (array)
-- `aircraftid` (integer)
-- `aclist` (array)
-- `transtype` (array)
-- `relationship` (array)
-- `startdate` (string)
-- `enddate` (string)
-- `lastactionstartdate` (string)
-- `lastactionenddate` (string)
-- `isinternaltrans` (eYesNoIgnoreFlag)
-- `isoperator` (eYesNoIgnoreFlag)
-
----
-
-## Contact
-
-### `GET` /api/Contact/getContact/{id}/{securityToken}
-**Get ALL Contact**
-
-**Path params:**
-- `id`: Contact ID (required)
-
----
-
-### `GET` /api/Contact/getIdentification/{id}/{securityToken}
-**Get Identification**
-
-**Path params:**
-- `id`: Contact ID (required)
-
----
-
-### `GET` /api/Contact/getPhonenumbers/{id}/{securityToken}
-**Get Phone Numbers**
-
-**Path params:**
-- `id`: Contact ID (required)
-
----
-
-### `GET` /api/Contact/getContAircraftRelationships/{id}/{securityToken}
-**Get Aircraft Relationships**
-
-**Path params:**
-- `id`: Contact ID (required)
-
----
-
-### `GET` /api/Contact/getOtherlistings/{id}/{securityToken}
-**Get Other Listings**
-
-**Path params:**
-- `id`: Contact ID (required)
-
----
-
-### `POST` /api/Contact/getContactList/{securityToken}
-**Get Contact List**
-
-**Request body** (`ContListOptions`):
-- `aircraftid` (array)
-- `companyid` (integer)
-- `companyname` (string)
-- `firstname` (string)
-- `lastname` (string)
-- `title` (string)
-- `email` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `phonenumber` (string)
-- `contactchanges` (string)
-- `contlist` (array)
-- `complist` (array)
-
----
-
-### `POST` /api/Contact/getContactListPaged/{securityToken}/{pagesize}/{page}
-**Get Contact List**
-
-**Path params:**
-- `pagesize`: Page Size (required)
-- `page`: Page (required)
-
-**Request body** (`ContListOptions`):
-- `aircraftid` (array)
-- `companyid` (integer)
-- `companyname` (string)
-- `firstname` (string)
-- `lastname` (string)
-- `title` (string)
-- `email` (string)
-- `actiondate` (string)
-- `enddate` (string)
-- `phonenumber` (string)
-- `contactchanges` (string)
-- `contlist` (array)
-- `complist` (array)
-
----
-
-## Model
-
-### `POST` /api/Model/getModelMarketTrends/{securityToken}
-**Get Model Market Trends**
-
-**Request body** (`ModelTrendOptions`):
-- `modlist` (array)
-- `displayRange` (integer)
-- `startdate` (string)
-- `enddate` (string)
-- `productcode` (array)
-
----
-
-### `POST` /api/Model/getModelOperationCosts/{securityToken}
-**Get Model Operation Costs**
-
-**Request body** (`ModelPerformanceOptions`):
-- `modlist` (array)
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `make` (string)
-- `annualhours` (integer)
-- `fuelprice` (integer)
-
----
-
-### `POST` /api/Model/getModelPerformanceSpecs/{securityToken}
-**Get Model Performance Specs**
-
-**Request body** (`ModelPerformanceOptions`):
-- `modlist` (array)
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `make` (string)
-- `annualhours` (integer)
-- `fuelprice` (integer)
-
----
-
-## Utility
-
-### `GET` /api/Utility/getAccountInfo/{securityToken}
-**Get my user account**
-
----
-
-### `GET` /api/Utility/getProductCodes/{securityToken}
-**Get my product codes**
-
----
-
-### `GET` /api/Utility/getAirframeTypes/{securityToken}
-**Get Aircraft Airframes**
-
----
-
-### `POST` /api/Utility/getMakeTypeList/{securityToken}
-**Get Aircraft Make Types**
-
-**Request body** (`AcAirframeOptions`):
-- `airframetype` (eAirFrameTypes)
-
----
-
-### `GET` /api/Utility/getWeightClassTypes/{securityToken}
-**Get Aircraft Weight Classes**
-
----
-
-### `GET` /api/Utility/getAirframeJniqSizes/{securityToken}
-**Get Aircraft Jniq Sizes**
-
----
-
-### `POST` /api/Utility/getAircraftMakeList/{securityToken}
-**Get Aircraft Makes**
-
-**Request body** (`AcMakeOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-
----
-
-### `POST` /api/Utility/getAircraftModelList/{securityToken}
-**Get Aircraft Models**
-
-**Request body** (`AcModelOptions`):
-- `airframetype` (eAirFrameTypes)
-- `maketype` (eMakeTypes)
-- `make` (string)
-
----
-
-### `GET` /api/Utility/getCompanyBusinessTypes/{securityToken}
-**Get Company Business Types**
-
----
-
-### `GET` /api/Utility/getAircraftCompanyRelationships/{securityToken}
-**Get Aircraft Company Relationship Types**
-
----
-
-### `GET` /api/Utility/getEventCategories/{securityToken}
-**Get Aircraft Event Categories**
-
----
-
-### `POST` /api/Utility/getEventTypes/{securityToken}
-**Get Aircraft Event Types**
-
-**Request body** (`AcEventOptions`):
-- `eventcategory` (string)
-
----
-
-### `POST` /api/Utility/getAirportList/{securityToken}
-**Get Airport List**
-
-**Request body** (`AirportOptions`):
-- `name` (string)
-- `city` (string)
-- `state` (array)
-- `statename` (array)
-- `country` (string)
-- `iata` (string)
-- `icao` (string)
-- `faaid` (string)
-
----
-
-### `POST` /api/Utility/getStateList/{securityToken}
-**Get State List**
-
-**Request body** (`CountryOptions`):
-- `country` (string)
-
----
-
-### `GET` /api/Utility/getCountryList/{securityToken}
-**Get Country List**
-
----
-
-### `GET` /api/Utility/getAircraftLifecycleStatus/{securityToken}
-**Get Aircraft LifeCycle Types**
-
----
-
-### `GET` /api/Utility/getAircraftHistoryTransTypes/{securityToken}
-**Get Aircraft History Transaction Types**
-
----
-
-
+# SOURCE: mcp/README.md
 ---
 
 # JETNET MCP Server — AI Agent Integration
@@ -6725,3 +6631,726 @@ AI agents can use natively**. Here's what that means in practice:
 ## License
 
 MIT — same as the parent repository.
+
+---
+# SOURCE: references/vertical-playbooks.md
+---
+
+# JETNET Vertical Playbooks
+
+One page per industry vertical. Each playbook follows the same format:
+the business question, the endpoint(s) that answer it, a minimal payload,
+and what to do with the response.
+
+---
+
+## 1. Aircraft Sales and Brokerage
+
+**The business question:** Who owns this aircraft, is it for sale, what is the
+asking price, what is its flight activity, and who are the decision makers?
+
+**Primary use case:** A broker wants to research a specific tail or a segment of
+the market before approaching a seller or buyer.
+
+### Tail research workflow
+
+```
+getRegNumber → get aircraftid
+getPictures  → show the aircraft
+getRelationships → confirm current owner and operator, get contacts
+getFlightData → understand utilization (active vs parked)
+getHistoryList → see prior transaction prices and ownership chain
+```
+
+### Market scan workflow (find for-sale inventory by model)
+
+```
+POST /api/Aircraft/getAircraftList/{apiToken}
+{
+  "maketype": "BusinessJet",
+  "modlist": [145, 634],       // G550, G600
+  "forsale": "true",
+  "lifecycle": "InOperation",
+  "aclist": []
+}
+```
+
+Response key is `aircraft`. Filter on `asking`/`askingprice` for price ranges.
+
+### Market trend context (how long do they sit, what do they sell for)
+
+```
+POST /api/Model/getModelMarketTrends/{apiToken}
+{
+  "modlist": [145, 634],
+  "displayRange": 24,
+  "startdate": "COMPUTE_24_MONTHS_AGO",
+  "productcode": ["None"]
+}
+```
+
+Key fields: `avg_asking_price`, `avg_daysonmarket`, `aircraft_for_sale_count`.
+
+### Who to call (decision makers)
+
+Once you have `companyid` from a relationship record:
+```
+POST /api/Company/getContacts/{companyid}/{apiToken}
+```
+
+Returns contacts with title, email, phone. Filter on title for CEO, VP, Director.
+
+---
+
+## 2. OEM Competitive Intelligence
+
+**The business question:** How is our model performing in the market vs competitors?
+Who is operating our aircraft and where? What is the delivery and transaction pace?
+
+### Market share by model
+
+```
+POST /api/Model/getModelMarketTrends/{apiToken}
+{
+  "modlist": [YOUR_MODELS + COMPETITOR_MODELS],
+  "displayRange": 36,
+  "startdate": "COMPUTE_36_MONTHS_AGO",
+  "productcode": ["None"]
+}
+```
+
+Compare `in_operation_count`, `aircraft_for_sale_count`, `avg_asking_price`,
+`avg_daysonmarket` across models over time. A rising `avg_daysonmarket` is a
+demand signal.
+
+### Delivery and transaction pace (new aircraft entering the fleet)
+
+```
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1
+{
+  "modlist": [YOUR_MODEL_IDS],
+  "transtype": ["Full Sale - Manufacturer to New"],
+  "startdate": "01/01/2024",
+  "enddate": "COMPUTE_TODAY",
+  "isnewaircraft": "Yes",
+  "allrelationships": true,
+  "aclist": []
+}
+```
+
+`Purchaser` in `companyrelationships` is the first buyer. Use this to map which
+operators are taking delivery and at what pace.
+
+### Fleet in operation by geography
+
+```
+POST /api/Aircraft/getAircraftList/{apiToken}
+{
+  "modlist": [YOUR_MODEL_IDS],
+  "lifecycle": "InOperation",
+  "aclist": []
+}
+```
+
+Group by `basecountry` and `basestate` for territory coverage maps.
+
+### Performance specs (for competitive comparison)
+
+```
+POST /api/Model/getModelPerformanceSpecs/{apiToken}
+{
+  "modlist": [YOUR_MODEL_ID, COMPETITOR_MODEL_ID],
+  "airframetype": "None",
+  "maketype": "None",
+  "make": "",
+  "annualhours": 0,
+  "fuelprice": 0
+}
+```
+
+---
+
+## 3. FBO Territory and Traffic Analysis
+
+**The business question:** What aircraft are based near us, who are the operators
+flying in and out, and which routes are most active?
+
+### Aircraft based in your territory
+
+```
+POST /api/Aircraft/getAircraftList/{apiToken}
+{
+  "airframetype": "FixedWing",
+  "maketype": "BusinessJet",
+  "lifecycle": "InOperation",
+  "basestate": ["TX", "OK", "LA"],
+  "basecountry": "US",
+  "aclist": [],
+  "modlist": []
+}
+```
+
+This gives you the local fleet. Cross with `getRelationships` using bulk `aclist`
+to get owner/operator contact info for the entire list in one call.
+
+### Traffic into your airport (origin/destination filtering)
+
+```
+POST /api/Aircraft/getFlightDataPaged/{apiToken}/100/1
+{
+  "origin": "KDAL",
+  "destination": "",
+  "startdate": "COMPUTE_90_DAYS_AGO",
+  "enddate": "COMPUTE_TODAY",
+  "aclist": [],
+  "modlist": []
+}
+```
+
+Swap `origin` for `destination` to see inbound traffic. Use `aircraftid` from
+results with `getRelationships` to identify which operators are most active.
+
+### Operator targeting (companies most active in your market)
+
+Aggregate flight records by `aircraftid`, count legs, then bulk-call `getRelationships`
+with the top-N aircraft IDs as `aclist`. This gives you the operators flying the
+most in your territory with their contact info.
+
+---
+
+## 4. MRO Targeting and Fleet Monitoring
+
+**The business question:** Which aircraft in our target segment are due for
+maintenance, who operates them, and who are the decision makers?
+
+### Fleet snapshot for a model segment
+
+```
+POST /api/Aircraft/getBulkAircraftExportPaged/{apiToken}/100/1
+{
+  "maketype": "BusinessJet",
+  "modlist": [TARGET_MODEL_IDS],
+  "lifecycle": "InOperation",
+  "actiondate": "",
+  "forsale": "",
+  "aclist": []
+}
+```
+
+Full aircraft records including `aftt` (airframe total time), `estaftt`,
+engine serial numbers, and maintenance tracking fields. Page through all results.
+
+### High-airframe-time aircraft (maintenance trigger)
+
+From the bulk export, filter on `estaftt` above your threshold. These are the
+aircraft most likely to need heavy maintenance. Take their `aircraftid` list and
+call `getRelationships` in bulk to get the MRO decision maker contacts.
+
+### Change tracking (new operators, recent transactions)
+
+```
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1
+{
+  "modlist": [TARGET_MODEL_IDS],
+  "startdate": "COMPUTE_90_DAYS_AGO",
+  "enddate": "COMPUTE_TODAY",
+  "transtype": ["None"],
+  "allrelationships": true,
+  "aclist": []
+}
+```
+
+New operator = new MRO relationship opportunity. Filter `transtype` for sale
+events to catch aircraft changing hands.
+
+### Contact lookup for decision makers
+
+```
+POST /api/Company/getContacts/{companyid}/{apiToken}
+```
+
+Filter by title for Director of Maintenance, VP of Operations, Chief Pilot.
+These are the MRO buyers.
+
+---
+
+## 5. Finance and Investment Diligence
+
+**The business question:** What is the asset worth, how has it traded historically,
+what are comparable transactions, and is the fleet in the collateral pool in good
+standing?
+
+### Single asset valuation context
+
+```
+POST /api/Model/getModelMarketTrends/{apiToken}
+{
+  "modlist": [ASSET_MODEL_ID],
+  "displayRange": 60,
+  "startdate": "COMPUTE_60_MONTHS_AGO",
+  "productcode": ["None"]
+}
+```
+
+60 months of `avg_asking_price`, `low_asking_price`, `high_asking_price`, and
+`avg_daysonmarket` gives you price trend and liquidity context for the model.
+
+### Transaction history for the specific aircraft
+
+```
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1
+{
+  "aclist": [AIRCRAFT_ID],
+  "transtype": ["None"],
+  "allrelationships": true,
+  "startdate": "01/01/2000",
+  "enddate": "COMPUTE_TODAY",
+  "aclist": [AIRCRAFT_ID],
+  "modlist": []
+}
+```
+
+Full chain of ownership for the asset. `soldprice` and `askingprice` fields on
+transaction records show actual deal prices where available.
+
+### Comparable sales (same model, recent transactions)
+
+```
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1
+{
+  "modlist": [ASSET_MODEL_ID],
+  "transtype": ["Full Sale - Preowned"],
+  "startdate": "COMPUTE_24_MONTHS_AGO",
+  "enddate": "COMPUTE_TODAY",
+  "ispreownedtrans": "Yes",
+  "allrelationships": true,
+  "aclist": []
+}
+```
+
+Filter for `isretailtrans: true` to isolate arm's length transactions. Use
+`soldprice` for comps.
+
+### Fleet-level collateral monitoring
+
+Given a list of aircraft IDs in the collateral pool:
+```
+POST /api/Aircraft/getCondensedOwnerOperators/{apiToken}
+{
+  "aclist": [ID1, ID2, ID3, ...],
+  "modlist": []
+}
+```
+
+Response key is `aircraftowneroperators`. Each record has `comp1relation`,
+`comp1name`, and `datepurchased`. Use `actiondate` parameter to pull only
+records that changed since your last snapshot -- essential for incremental
+monitoring without re-pulling the entire pool.
+
+---
+
+## 6. Charter Supplemental Lift -- Fractional Owner Targeting
+
+**The business question:** Which fractional owners of large jets in my target
+markets have had a recent record update? These are the prospects most likely to
+need supplemental lift -- they own fractional shares but occasionally need more
+capacity or a different aircraft category.
+
+**Primary use case:** A charter company wants to identify business jet fractional
+owners in the Northeast with recent activity and approach them with supplemental
+lift offerings.
+
+### Find fractional owners by geography and aircraft type
+
+```
+POST /api/Aircraft/getAcCompanyFractionalReportPaged/{apiToken}/{pagesize}/{page}
+{
+  "airframetype": "FixedWing",
+  "maketype": "BusinessJet",
+  "regnbr": "",
+  "make": "",
+  "actiondate": "COMPUTE_30_DAYS_AGO",
+  "enddate": "COMPUTE_TODAY",
+  "basestate": ["NY", "CT", "MA", "RI", "NJ"],
+  "modlist": [],
+  "relationship": ["Fractional Owner"]
+}
+```
+
+Response key is `aircraftcompfractionalrefs`. Page through all results using
+`maxpages`. Each page returns `count` records (typically 25-100 per page).
+
+**Key fields for outreach:**
+
+| Field | What it tells you |
+|-------|-------------------|
+| `company` | Fractional owner company or individual name |
+| `contactFirstName` / `contactLastName` | Decision maker name |
+| `contactEmailAddress` | Direct email |
+| `contactMobile` | Mobile number |
+| `fractionPercentOwned` | `"100.00"` = sole owner; partial% = true fractional share |
+| `make` / `model` | Aircraft type they own (e.g., CHALLENGER 604) |
+| `regnbr` | Tail number |
+| `compCity` / `compState` | Billing address / home base |
+| `programManager` | Fractional program operator (may be "UNKNOWN") |
+| `programHolder` | Program holding entity (may be "UNKNOWN") |
+| `lastFractionPurchaseDate` | When they last bought in -- recency signal |
+
+**Filter for actual owners only:** `fractionPercentOwned != "0.00"` -- the
+response includes operators and managers on the same aircraft with `"0.00"`.
+Pass `"relationship": ["Fractional Owner"]` in the request to pre-filter, but
+also post-filter in code to be safe.
+
+### Targeting by specific aircraft model (e.g., heavy jets only)
+
+```
+POST /api/Aircraft/getAcCompanyFractionalReportPaged/{apiToken}/{pagesize}/{page}
+{
+  "airframetype": "FixedWing",
+  "maketype": "BusinessJet",
+  "regnbr": "",
+  "make": "",
+  "actiondate": "COMPUTE_90_DAYS_AGO",
+  "enddate": "COMPUTE_TODAY",
+  "basestate": [],
+  "modlist": [33, 34, 35],
+  "relationship": ["Fractional Owner"]
+}
+```
+
+Pass model IDs in `modlist` to narrow to specific aircraft types. Use
+`getAircraftModelList` or `references/id-glossary.md` to find model IDs.
+Leave `basestate: []` for national scope.
+
+### Enrichment workflow (from fractional record to full relationship picture)
+
+```
+1. getAcCompanyFractionalReportPaged  --> aircraftid + companyid + contact info
+2. getRelationships (bulk aclist)      --> confirm current operator structure
+3. getFlightDataPaged (per aircraftid) --> utilization (is the fraction being used?)
+```
+
+High utilization + fractional share = strong candidate for supplemental lift.
+Low utilization may indicate a program exit or aircraft transition -- also a
+sales signal for a new purchase.
+
+### Common mistakes on this endpoint
+
+- Response key is `aircraftcompfractionalrefs` -- not `aircraft`, not `fractionalowners`
+- Each aircraft appears multiple times (one row per relation type) -- deduplicate on `aircraftid` + `companyid` before building a contact list
+- `relationship` filter is an array: `["Fractional Owner"]` -- not a string
+- `basestate` is an array of abbreviations: `["NY", "CT"]` -- not full state names
+- `actiondate` / `enddate` use `MM/DD/YYYY` format with leading zeros
+- `programManager` and `programHolder` are often `"UNKNOWN"` for self-managed programs -- do not filter on these fields expecting clean data
+
+Known-good example: `examples/fractional-owner-report.json`
+
+---
+
+## 7. FBO Ramp Contact Targeting
+
+**The business question:** Which companies and decision makers are flying into
+my FBO? I want to reach chief pilots, directors of aviation, schedulers, and
+dispatchers to win their fuel, handling, and services business over competitors.
+
+**Primary use case:** An FBO collects tail numbers from ramp activity or ADS-B
+data, then uses JETNET to identify the right contacts at each company for a
+targeted outreach campaign.
+
+### Single tail lookup (Tier A -- Golden Path start)
+
+```
+GET /api/Aircraft/getRegNumber/{regnbr}/{apiToken}
+```
+
+No request body. Returns `aircraftresult` with a `companyrelationships` array.
+
+**CRITICAL -- getRegNumber uses a flat schema, not nested objects:**
+
+| Field | What it contains |
+|-------|-----------------|
+| `companyrelation` | Relation type: `"Owner"`, `"Operator"`, `"Chief Pilot"`, etc. |
+| `companyname` | Company name (prefixed, not nested) |
+| `contactfirstname` / `contactlastname` | Contact name |
+| `contacttitle` | Job title -- filter on this for outreach targeting |
+| `contactemail` | Email address |
+| `contactbestphone` | Best phone (office or mobile) |
+| `contactofficephone` / `contactmobilephone` | Phone details |
+| `baseicao` | Home airport ICAO code |
+
+### Filter for the right contacts
+
+```python
+TARGET_TITLES = {"chief pilot", "director of aviation", "scheduler",
+                 "dispatcher", "director of flight operations", "flight coordinator"}
+
+contacts = [
+    r for r in aircraft["companyrelationships"]
+    if r.get("contacttitle", "").lower() in TARGET_TITLES
+       or r.get("companyrelation") in ("Chief Pilot", "Operator")
+]
+```
+
+Note: field is `companyrelation` (not `relationtype`) -- this is unique to
+`getRegNumber`. See `references/id-glossary.md` for the full schema comparison.
+
+### Bulk ramp list workflow (many tails at once)
+
+For a ramp list of 10+ tails, use `getRelationships` with `aclist` in bulk
+rather than looping `getRegNumber` per tail:
+
+```
+1. getRegNumber per tail           --> aircraftid for each tail
+2. getRelationships (bulk aclist)  --> all relationships in one POST
+3. getContacts per companyid       --> full contact list for each company
+```
+
+`getRelationships` bulk returns the nested schema (`relationtype`, `company {}`,
+`contact {}` sub-objects) -- different from `getRegNumber` flat schema.
+
+### Aircraft based at your airport (proactive prospecting)
+
+```
+POST /api/Aircraft/getAircraftList/{apiToken}
+{
+  "airframetype": "FixedWing",
+  "maketype": "BusinessJet",
+  "lifecycle": "InOperation",
+  "baseicao": "KSDL",
+  "aclist": [],
+  "modlist": []
+}
+```
+
+Returns all jets based at your airport. Take their `aircraftid` list into
+`getRelationships` bulk to get all contacts in one call.
+
+Known-good example: `examples/fbo-contact-lookup.json`
+
+---
+
+## 8. Dealer-Broker Hourly Market Intelligence Feed
+
+**The business question:** What changed in the JETNET database in the last hour?
+A dealer-broker runs this on the hour, 24/7/365, to recompute market dynamics
+the moment JETNET data updates -- new listings, price changes, ownership
+transfers, or status changes.
+
+**Primary use case:** Automated pipeline that detects every aircraft record
+change in a 1-hour window and feeds a live market dashboard or pricing model.
+
+### Hourly change query (Tier B -- always paged)
+
+```
+POST /api/Aircraft/getBulkAircraftExportPaged/{apiToken}/{pagesize}/{page}
+{
+  "airframetype": "None",
+  "maketype": "BusinessJet",
+  "lifecycle": "InOperation",
+  "actiondate": "MM/DD/YYYY HH:MM:SS",
+  "enddate":    "MM/DD/YYYY HH:MM:SS",
+  "exactMatchReg": false,
+  "showHistoricalAcRefs": false,
+  "showAwaitingDocsCompanies": false,
+  "showMaintenance": false,
+  "showAdditionalEquip": false,
+  "showExterior": false,
+  "showInterior": false
+}
+```
+
+Set `actiondate` = last run time, `enddate` = current time. Store last run
+time after each successful call and use it as the next `actiondate`.
+
+**CRITICAL datetime format:** `actiondate` and `enddate` accept full datetime
+with time component: `"02/26/2026 10:00:00"`. Date-only strings also work
+but miss sub-day changes. Always include time for hourly polling.
+
+### Paging quirk -- maxpages: 0 on small result sets
+
+```python
+# WRONG -- will miss single-page results
+while page <= data["maxpages"]:  # maxpages=0 exits immediately!
+
+# CORRECT -- treat maxpages <= 1 as a single page
+total_pages = max(data.get("maxpages", 1), 1)
+while page <= total_pages:
+    ...
+```
+
+When all results fit in one call, JETNET returns `maxpages: 0` and
+`currentpage: 0` -- this is not an error. The `aircraft` array still
+contains all records.
+
+### Decoding the responsestatus summary
+
+```python
+# "SUCCESS: Ac Count: 12 Comp Count: 28 Cont Count: 24 ..."
+status = data["responsestatus"]
+# Parse counts if needed:
+import re
+counts = dict(re.findall(r'(\w[\w ]+\w):\s*(\d+)', status))
+# {"Ac Count": "12", "Comp Count": "28", ...}
+```
+
+### Flat prefixed relationship schema
+
+`getBulkAircraftExport` uses a unique flat prefixed schema -- every relationship
+is embedded directly in the aircraft record with role-based prefixes:
+
+| Prefix | Role |
+|--------|------|
+| `owr*` | Owner (`owrcompanyname`, `owrfname`, `owrtitle`, `owremail`, `owrphone1`) |
+| `opr*` | Operator |
+| `chp*` | Chief Pilot |
+| `excbrk1*` / `excbrk2*` | Exclusive Brokers |
+| `addl1*` / `addl2*` / `addl3*` | Additional relationships |
+
+`forsale` in this endpoint is `"Y"` / `"N"` / `""` -- NOT `"true"`/`"false"`
+as in `getAircraftList`.
+
+`datepurchased` is `YYYYMMDD` format -- convert before comparing to other dates.
+
+### Embedded sub-arrays (avoid extra API calls)
+
+Each aircraft record contains embedded arrays controlled by the `show*` flags:
+
+| Flag | Array | Use when |
+|------|-------|----------|
+| `showMaintenance: true` | `acmaintenance[]` | MRO targeting |
+| `showAdditionalEquip: true` | `acaddequipment[]` | Equipment research |
+| `showExterior: true` | `acexteriors[]` | Refurb/paint targeting |
+| `showInterior: true` | `acinteriors[]` | Interior upgrade targeting |
+| Always included | `acevents[]` | Ownership/status change history |
+| Always included | `flightdata[]` | Monthly flight hour summary |
+
+Keep all `show*` flags false for hourly polling -- reduces payload size
+significantly. Enable only the sub-arrays your pipeline actually processes.
+
+### Hourly polling scheduler (Python skeleton)
+
+```python
+import time, datetime
+
+def poll_hourly(bearer, token, maketype="BusinessJet"):
+    last_run = datetime.datetime.now() - datetime.timedelta(hours=1)
+    while True:
+        now = datetime.datetime.now()
+        body = {
+            "airframetype": "None",
+            "maketype": maketype,
+            "lifecycle": "InOperation",
+            "actiondate": last_run.strftime("%m/%d/%Y %H:%M:%S"),
+            "enddate":    now.strftime("%m/%d/%Y %H:%M:%S"),
+            "exactMatchReg": False,
+            "showHistoricalAcRefs": False,
+            "showAwaitingDocsCompanies": False,
+            "showMaintenance": False,
+            "showAdditionalEquip": False,
+            "showExterior": False,
+            "showInterior": False,
+        }
+        changes = get_bulk_export(bearer, token, body, pagesize=100)
+        process_changes(changes)    # your pipeline here
+        last_run = now
+        time.sleep(3600)            # sleep until next hour
+```
+
+Known-good example: `examples/bulk-export-hourly.json`
+
+---
+
+## 9. Transaction and Sale History Search
+
+**The business question:** What aircraft in this model segment sold or leased
+in a given time window? Who were the buyers, sellers, and brokers? What were
+the asking prices and deal terms?
+
+**Primary use cases:** Brokers researching comparable sales ("comps") for a
+listing; analysts tracking market velocity; dealers sourcing aircraft that
+recently changed hands; CRM teams identifying new owners to approach.
+
+### Find all sales and leases for a model in a date range
+
+```
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pagesize}/{page}
+{
+  "make": "",
+  "modelid": 0,
+  "modlist": [1194],
+  "transtype": ["FullSale", "Lease"],
+  "startdate": "MM/DD/YYYY",
+  "enddate":   "MM/DD/YYYY",
+  "isinternaltrans": "No",
+  "isnewaircraft": "No",
+  "allrelationships": true,
+  "aclist": []
+}
+```
+
+`modlist: [1194]` = Citation CJ3+. Use `getAircraftModelList` or the
+`references/id-glossary.md` to find model IDs for other types.
+
+**`transtype` request values are category prefixes, not full strings:**
+
+| Request value | What it matches in response |
+|---------------|-----------------------------|
+| `"None"` | All transaction types |
+| `"FullSale"` | Full Sale - Retail to Retail, Full Sale - Retail to Unidentified, Full Sale - Retail to Leasing Company, etc. |
+| `"Lease"` | Lease - Leasing Company to Retail, Lease - Operator to Operator, etc. |
+| `"InternalSale"` | Internal/intra-company transfers |
+| `"Management"` | Management company changes |
+| `"Insurance"` | Insurance claims/write-offs |
+
+**Filter flags (all tristate: `"Yes"` / `"No"` / `"Ignore"`):**
+- `isinternaltrans: "No"` -- exclude intra-company transfers for real market deals
+- `isnewaircraft: "No"` -- exclude new deliveries (preowned only)
+- `ispreownedtrans` -- explicit preowned filter (alternative to `isnewaircraft`)
+
+### Key response fields per transaction record
+
+| Field | What it means |
+|-------|--------------|
+| `transid` | JETNET transaction ID -- use as join key for deduplication |
+| `transtype` | Full descriptive string (e.g., `"Full Sale - Retail to Retail"`) |
+| `transdate` | Actual transaction date (ISO timestamp) |
+| `actiondate` | When JETNET last updated this record (ISO timestamp) |
+| `transretail` | `true` = arm's length transaction -- use for comp analysis |
+| `internaltrans` | `false` = not an intra-company transfer |
+| `newac` | `"preowned"` or `"new"` |
+| `soldprice` | Actual sale price -- often `null` (confidential deals) |
+| `askingprice` | Listed asking price -- more often populated than soldprice |
+| `listdate` | Date aircraft was first listed for sale |
+| `pageurl` | Link to JETNET Evolution web app detail page |
+| `description` | Human-readable transaction summary, e.g., `"Sold from X to Y"` |
+
+### companyrelationships in history records
+
+History records use the **nested schema** (same as `getRelationships`):
+`company: {}` and `contact: {}` sub-objects. The `relationtype` values
+specific to transactions are:
+
+`"Seller"`, `"Purchaser"`, `"Operator"`, `"Seller's Broker"`, `"Purchaser's Broker"`
+
+Pass `allrelationships: true` to get all parties in one call.
+
+### Comp analysis workflow (find comparable sales)
+
+```
+1. getHistoryListPaged           --> all transactions matching model + date range
+2. Filter: transretail=true      --> arm's length deals only
+3. Filter: internaltrans=false   --> exclude internal transfers
+4. Extract: askingprice, soldprice, transdate, regnbr, estaftt
+5. getRelationships (bulk aclist) --> current owner for each aircraft transacted
+```
+
+`soldprice` is null on most deals. For pricing intelligence, use
+`askingprice` + `getModelMarketTrends` for published comps.
+
+### maxpages: 0 quirk on small result sets
+
+When results fit in a single response, `maxpages: 0` and `currentpage: 0`
+are returned -- this is normal, not an error. `paginate.py` handles this
+automatically. Raw callers should use `max(maxpages, 1)` in their loop.
+
+Known-good example: `examples/history-transaction-search.json`

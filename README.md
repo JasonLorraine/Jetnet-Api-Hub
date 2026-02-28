@@ -285,6 +285,7 @@ See the full working implementation:
 | [Trends](docs/trends.md) | Market trends & time-series analytics: combining endpoints for longitudinal analysis |
 | [Events](docs/events.md) | Aircraft events: discrete lifecycle changes, market velocity, causal analytics |
 | [Flight Data](docs/flight-data.md) | Flight activity + monthly utilization: getFlightData vs getFlights |
+| [Aircraft](docs/aircraft.md) | 21 Aircraft endpoints: full record, sub-records, tail/hex lookup, fleet search, relationships |
 | [Contacts](docs/contacts.md) | 7 Contact endpoints: lookup, search, phones, aircraft relationships |
 | [Companies](docs/companies.md) | 9 Company endpoints: profile, search, aircraft ties, history |
 | [Model Data](docs/model-data.md) | Operation costs, performance specs, model intelligence |

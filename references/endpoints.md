@@ -26,6 +26,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `aircraft` (object -- composite with nested identification, airframe, engine, apu, avionics, features, interior, exterior, maintenance, leases, pictures, companyrelationships, status)
+
 ---
 
 ### `GET` /api/Aircraft/getIdentification/{id}/{securityToken}
@@ -33,6 +35,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `identification` (object -- aircraftid, modelid, make, model, sernbr, regnbr, yearmfr, yeardlv, actiondate, pageurl)
 
 ---
 
@@ -42,6 +46,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `status` (object)
+
 ---
 
 ### `GET` /api/Aircraft/getAirframe/{id}/{securityToken}
@@ -49,6 +55,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `airframe` (object -- aftt, landings, timesasofdate, estaftt)
 
 ---
 
@@ -58,6 +66,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `engine` (object -- maintenanceprogram, model, enginenoiserating; contains `engines[]` sub-array with per-engine sequencenumber, serialnumber, timesincenew, tbo)
+
 ---
 
 ### `GET` /api/Aircraft/getApu/{id}/{securityToken}
@@ -65,6 +75,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `apu` (object or null; responsestatus may be "SUCCESS: NO RESULTS FOUND [APU]")
 
 ---
 
@@ -74,6 +86,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `companyrelationships` (array) + `count` -- fields: companyid, name, relationtype, relationseqno, contactid, ownerpercent, fractionexpiresdate, isoperator (string "Y"/"N")
+
 ---
 
 ### `GET` /api/Aircraft/getMaintenance/{id}/{securityToken}
@@ -81,6 +95,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `maintenance` (object)
 
 ---
 
@@ -90,6 +106,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `avionics` (array of { name, description }) + `count`
+
 ---
 
 ### `GET` /api/Aircraft/getFeatures/{id}/{securityToken}
@@ -97,6 +115,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `features` (array) + `count`
 
 ---
 
@@ -106,6 +126,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `additionalequipment` (array of { name, description }) + `count`
+
 ---
 
 ### `GET` /api/Aircraft/getInterior/{id}/{securityToken}
@@ -113,6 +135,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `interior` (object)
 
 ---
 
@@ -122,6 +146,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `exterior` (object)
+
 ---
 
 ### `GET` /api/Aircraft/getLeases/{id}/{securityToken}
@@ -129,6 +155,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `leases` (array or null)
 
 ---
 
@@ -138,6 +166,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `id`: Aircraft ID (required)
 
+**Response key:** `flightsummary` (object/array)
+
 ---
 
 ### `GET` /api/Aircraft/getPictures/{id}/{securityToken}
@@ -145,6 +175,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `id`: Aircraft ID (required)
+
+**Response key:** `pictures` (array) + `count`
 
 ---
 
@@ -154,6 +186,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Path params:**
 - `reg`: Registration Number (required)
 
+**Response key:** `aircraftresult` (object -- flat schema with companyrelation field, not relationtype)
+
 ---
 
 ### `GET` /api/Aircraft/getHexNumber/{hex}/{securityToken}
@@ -161,6 +195,8 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 
 **Path params:**
 - `hex`: Hexcode Number (required)
+
+**Response key:** `aircraft` (object)
 
 ---
 

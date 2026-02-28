@@ -57,12 +57,29 @@ All POST endpoints require a JSON body with at minimum aclist and modlist. See p
 
 | Endpoint | Response Key | Type |
 |----------|-------------|------|
+| getAircraft | aircraft | Object (composite with all sub-records) |
+| getIdentification | identification | Object |
+| getStatus | status | Object |
+| getAirframe | airframe | Object (aftt, landings, timesasofdate) |
+| getEngine | engine | Object (contains engines[] sub-array) |
+| getApu | apu | Object or null |
+| getAvionics | avionics | Array + count |
+| getFeatures | features | Array + count |
+| getAdditionalEquipment | additionalequipment | Array + count |
+| getInterior | interior | Object |
+| getExterior | exterior | Object |
+| getMaintenance | maintenance | Object |
+| getLeases | leases | Array or null |
+| getCompanyrelationships | companyrelationships | Array + count |
+| getFlights | flightsummary | Object/Array |
 | getRegNumber | aircraftresult | Object |
+| getHexNumber | aircraft | Object |
 | getAircraftList | aircraft | Array |
+| getRelationships | relationships | Array |
+| getAllAircraftObjects | allaircraftobjects | Array |
 | getHistoryListPaged | history | Array |
 | getFlightDataPaged | flightdata | Array |
 | getEventListPaged | events | Array |
-| getRelationships | relationships | Array |
 | getBulkAircraftExport | aircraft | Array |
 | getCondensedOwnerOperators | aircraftowneroperators | Array |
 | getPictures | pictures | Array |
@@ -145,6 +162,32 @@ CompanyCard: companyId, name, city, state, country, phone, email, contact (Conta
 ContactCard: contactId, firstName, lastName, title, email, phone
 
 GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, categorySize, weightClass, forSale, askingPrice, owner, operator, chiefPilot, baseIcao, baseAirport, baseCountry, dataSource="JETNET"
+
+## Aircraft Endpoints (docs/aircraft.md)
+
+Three access patterns for aircraft data:
+
+1. Full record: GET /api/Aircraft/getAircraft/{id}/{apiToken} -> `aircraft` (composite with all sub-records)
+2. Sub-records (14 GET endpoints, all /api/Aircraft/{endpoint}/{id}/{apiToken}):
+   - getIdentification -> identification | getStatus -> status | getAirframe -> airframe (aftt, landings)
+   - getEngine -> engine (engines[] sub-array) | getApu -> apu (null if missing) | getAvionics -> avionics[]
+   - getFeatures -> features[] | getAdditionalEquipment -> additionalequipment[] | getInterior -> interior
+   - getExterior -> exterior | getMaintenance -> maintenance | getLeases -> leases (null if missing)
+   - getPictures -> pictures[] | getCompanyrelationships -> companyrelationships[] (isoperator is "Y"/"N" string)
+3. Quick lookup: GET /api/Aircraft/getRegNumber/{tail}/{apiToken} -> aircraftresult (flat schema)
+   GET /api/Aircraft/getHexNumber/{hex}/{apiToken} -> aircraft
+
+Fleet search: POST /api/Aircraft/getAircraftList/{apiToken} -> aircraft[] (no paged variant -- use filters to limit)
+Batch relationships: POST /api/Aircraft/getRelationships/{apiToken} -> relationships[] (nested schema with relationtype)
+Bulk detail: POST /api/Aircraft/getAllAircraftObjects/{apiToken}/{pagesize}/{page} -> allaircraftobjects[] (requires aclist)
+
+Gotchas:
+- getApu returns null with "SUCCESS: NO RESULTS FOUND [APU]" -- still starts with "SUCCESS"
+- getEngine has engine.engines[] sub-array (two levels: model data + per-engine data)
+- getCompanyrelationships.isoperator is string "Y"/"N" not boolean
+- getAircraftList has NO paged variant; use getBulkAircraftExportPaged for large datasets
+- getRegNumber uses flat schema (companyrelation); getRelationships uses nested (relationtype)
+- getFlights (flight summary) is at /api/Aircraft/getFlights/{id}/{apiToken} -> flightsummary
 
 ## Bulk Export (getBulkAircraftExportPaged)
 
