@@ -259,8 +259,11 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 
 Contact is a relationship hub connecting companies, aircraft, and listings. Join key: contactid.
 
-getContactListPaged (POST, paged) -- Search contacts by name, company, role.
-  Response key: contactlist. Fields: contactid, firstname, lastname, title, companyname, companyid.
+getContactList (POST) -- Search contacts by name, company, role. Non-paged.
+  Response key: contacts. Fields: contactid, firstname, lastname, title, companyname, companyid.
+
+getContactListPaged (POST, paged) -- Same as getContactList but with pagination.
+  Response key: contactlist (NOT contacts -- key changes between variants).
 
 getContact (GET) -- Full contact record by contactid.
   URL: /api/Contact/getContact/{contactId}/{apiToken}
@@ -284,10 +287,14 @@ Workflow: search (getContactListPaged) → verify (getIdentification) → full p
 
 Company is the organizational node linking contacts, aircraft, and certifications. Join key: companyid.
 
-getCompanyListPaged (POST, paged) -- Search companies by name, type, location.
-  Response key: companylist. Fields: companyid, companyname, city, state, country.
+getCompanyList (POST) -- Search companies by name, type, location. Non-paged.
+  Response key: companies. Fields: companyid, companyname, city, state, country.
 
-getCompany (POST) -- Full company record by companyid.
+getCompanyListPaged (POST, paged) -- Same as getCompanyList but with pagination.
+  Response key: companylist (NOT companies -- key changes between variants).
+
+getCompany (GET) -- Full company record by companyid.
+  URL: /api/Company/getCompany/{companyId}/{apiToken}
   Response key: company. Includes nested objects.
 
 getContacts (GET) -- Returns contact ID arrays only (not full objects). N+1 fan-out risk.
@@ -3065,7 +3072,7 @@ POST /api/Contact/getContactList/{apiToken}
 }
 ```
 
-**Response key:** `contactlist` (array)
+**Response key:** `contacts` (array)
 
 ### getContactListPaged
 
@@ -3079,7 +3086,9 @@ POST /api/Contact/getContactListPaged/{apiToken}/{pagesize}/{page}
 
 **Request body:** Same `ContListOptions` as `getContactList`.
 
-**Response includes:** `currentpage`, `maxpages`, `count`, `contacts[]`
+**Response key:** `contactlist` (array) — note this differs from the non-paged variant which uses `contacts`.
+
+**Response includes:** `currentpage`, `maxpages`, `count`, `contactlist[]`
 
 Use this endpoint for data warehouse ingestion, CRM synchronization, and batch exports. See [pagination](pagination.md) for the standard paging pattern.
 
@@ -3091,7 +3100,27 @@ Lightweight endpoint returning only identification metadata — useful when you 
 GET /api/Contact/getIdentification/{contactId}/{apiToken}
 ```
 
-**Returns:** Contact name, title, company ID, email, action date.
+**Response key:** `contactIdentification` (object)
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "contactIdentification": {
+    "contactid": 343,
+    "companyid": 215,
+    "actiondate": "2011-01-05T16:08:20",
+    "sirname": "Mr.",
+    "firstname": "William",
+    "middleinitial": "P",
+    "lastname": "Butler",
+    "suffix": null,
+    "title": "President",
+    "email": null
+  }
+}
+```
+
+**Key fields:** contactid, companyid, firstname, lastname, title, email, actiondate.
 
 ### getPhonenumbers
 
@@ -3708,7 +3737,10 @@ Search for companies by name, location, business type, aircraft association, and
 
 ### Response Key
 
-`companylist` (array)
+Non-paged (`getCompanyList`): `companies` (array)
+Paged (`getCompanyListPaged`): `companylist` (array)
+
+The response key **changes** between paged and non-paged variants. Non-paged also returns `currentpage: 0, maxpages: 0` — do not interpret these as paging metadata.
 
 Always use the paged variant (`getCompanyListPaged`) for automated pipelines and production workflows.
 
@@ -4930,6 +4962,29 @@ POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pageSize}/{page}
 ```
 
 Build your URL helper to accept optional `id`, `pageSize`, and `page` parameters rather than assuming one shape fits all.
+
+## Response key changes between paged and non-paged variants
+
+The non-paged and paged versions of the same search endpoint use **different response keys**:
+
+| Endpoint (non-paged) | Response key | Endpoint (paged) | Response key |
+|----------------------|-------------|------------------|-------------|
+| `getContactList` | `contacts` | `getContactListPaged` | `contactlist` |
+| `getCompanyList` | `companies` | `getCompanyListPaged` | `companylist` |
+
+Non-paged endpoints also return `currentpage: 0` and `maxpages: 0` — do **not** interpret these as paging metadata.
+
+```python
+# Wrong — assumes same key for both variants
+data = response.json()
+records = data["contacts"]  # works for non-paged, breaks for paged
+
+# Correct — use the right key per variant
+if is_paged:
+    records = data["contactlist"]
+else:
+    records = data["contacts"]
+```
 
 ## N+1 and Fan-Out Risks
 

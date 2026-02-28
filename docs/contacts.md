@@ -94,7 +94,7 @@ POST /api/Contact/getContactList/{apiToken}
 }
 ```
 
-**Response key:** `contactlist` (array)
+**Response key:** `contacts` (array)
 
 ### getContactListPaged
 
@@ -108,7 +108,9 @@ POST /api/Contact/getContactListPaged/{apiToken}/{pagesize}/{page}
 
 **Request body:** Same `ContListOptions` as `getContactList`.
 
-**Response includes:** `currentpage`, `maxpages`, `count`, `contacts[]`
+**Response key:** `contactlist` (array) — note this differs from the non-paged variant which uses `contacts`.
+
+**Response includes:** `currentpage`, `maxpages`, `count`, `contactlist[]`
 
 Use this endpoint for data warehouse ingestion, CRM synchronization, and batch exports. See [pagination](pagination.md) for the standard paging pattern.
 
@@ -120,7 +122,27 @@ Lightweight endpoint returning only identification metadata — useful when you 
 GET /api/Contact/getIdentification/{contactId}/{apiToken}
 ```
 
-**Returns:** Contact name, title, company ID, email, action date.
+**Response key:** `contactIdentification` (object)
+
+```json
+{
+  "responsestatus": "SUCCESS",
+  "contactIdentification": {
+    "contactid": 343,
+    "companyid": 215,
+    "actiondate": "2011-01-05T16:08:20",
+    "sirname": "Mr.",
+    "firstname": "William",
+    "middleinitial": "P",
+    "lastname": "Butler",
+    "suffix": null,
+    "title": "President",
+    "email": null
+  }
+}
+```
+
+**Key fields:** contactid, companyid, firstname, lastname, title, email, actiondate.
 
 ### getPhonenumbers
 

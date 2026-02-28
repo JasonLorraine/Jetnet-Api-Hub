@@ -427,7 +427,10 @@ Search for companies by name, location, business type, aircraft association, and
 
 ### Response Key
 
-`companylist` (array)
+Non-paged (`getCompanyList`): `companies` (array)
+Paged (`getCompanyListPaged`): `companylist` (array)
+
+The response key **changes** between paged and non-paged variants. Non-paged also returns `currentpage: 0, maxpages: 0` — do not interpret these as paging metadata.
 
 Always use the paged variant (`getCompanyListPaged`) for automated pipelines and production workflows.
 

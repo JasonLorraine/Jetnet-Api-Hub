@@ -259,8 +259,11 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 
 Contact is a relationship hub connecting companies, aircraft, and listings. Join key: contactid.
 
-getContactListPaged (POST, paged) -- Search contacts by name, company, role.
-  Response key: contactlist. Fields: contactid, firstname, lastname, title, companyname, companyid.
+getContactList (POST) -- Search contacts by name, company, role. Non-paged.
+  Response key: contacts. Fields: contactid, firstname, lastname, title, companyname, companyid.
+
+getContactListPaged (POST, paged) -- Same as getContactList but with pagination.
+  Response key: contactlist (NOT contacts -- key changes between variants).
 
 getContact (GET) -- Full contact record by contactid.
   URL: /api/Contact/getContact/{contactId}/{apiToken}
@@ -284,10 +287,14 @@ Workflow: search (getContactListPaged) → verify (getIdentification) → full p
 
 Company is the organizational node linking contacts, aircraft, and certifications. Join key: companyid.
 
-getCompanyListPaged (POST, paged) -- Search companies by name, type, location.
-  Response key: companylist. Fields: companyid, companyname, city, state, country.
+getCompanyList (POST) -- Search companies by name, type, location. Non-paged.
+  Response key: companies. Fields: companyid, companyname, city, state, country.
 
-getCompany (POST) -- Full company record by companyid.
+getCompanyListPaged (POST, paged) -- Same as getCompanyList but with pagination.
+  Response key: companylist (NOT companies -- key changes between variants).
+
+getCompany (GET) -- Full company record by companyid.
+  URL: /api/Company/getCompany/{companyId}/{apiToken}
   Response key: company. Includes nested objects.
 
 getContacts (GET) -- Returns contact ID arrays only (not full objects). N+1 fan-out risk.

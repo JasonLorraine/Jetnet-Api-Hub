@@ -131,6 +131,29 @@ POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pageSize}/{page}
 
 Build your URL helper to accept optional `id`, `pageSize`, and `page` parameters rather than assuming one shape fits all.
 
+## Response key changes between paged and non-paged variants
+
+The non-paged and paged versions of the same search endpoint use **different response keys**:
+
+| Endpoint (non-paged) | Response key | Endpoint (paged) | Response key |
+|----------------------|-------------|------------------|-------------|
+| `getContactList` | `contacts` | `getContactListPaged` | `contactlist` |
+| `getCompanyList` | `companies` | `getCompanyListPaged` | `companylist` |
+
+Non-paged endpoints also return `currentpage: 0` and `maxpages: 0` — do **not** interpret these as paging metadata.
+
+```python
+# Wrong — assumes same key for both variants
+data = response.json()
+records = data["contacts"]  # works for non-paged, breaks for paged
+
+# Correct — use the right key per variant
+if is_paged:
+    records = data["contactlist"]
+else:
+    records = data["contacts"]
+```
+
 ## N+1 and Fan-Out Risks
 
 ### Company → Contacts returns ID arrays, not full objects
