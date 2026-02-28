@@ -314,6 +314,7 @@ See the full working implementation:
 | [Model Data](docs/model-data.md) | Operation costs, performance specs, model intelligence |
 | [Airports](docs/airports.md) | Airport reference data, geographic dimension table |
 | [Utility Endpoints](docs/utility-endpoints.md) | Cacheable reference tables: lifecycle, makes, models, sizes, types |
+| [Junior Dev Guide](docs/junior-dev-guide.md) | First 4 endpoints, common errors, minimal request bodies, session helpers |
 | [JETNET Lite](docs/jetnet-lite.md) | Reference architecture: tail number → full dashboard in 7 API calls |
 | [Data Model](docs/data-model.md) | Aircraft ↔ Company ↔ Contact entity graph and relationship traversal |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |

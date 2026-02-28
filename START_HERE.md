@@ -31,6 +31,8 @@ if responsestatus starts with "ERROR" → it failed, even though HTTP said 200
 
 ## Choose Your Path
 
+> **New to APIs?** Start with the [Junior Dev Guide](docs/junior-dev-guide.md) -- it teaches only the 4 endpoints that matter, with copy-paste examples and the 5 mistakes every new developer hits.
+
 ### Path A: "I want a demo UI in 5 minutes"
 
 You want to see a working app, type in a tail number, and get results.
