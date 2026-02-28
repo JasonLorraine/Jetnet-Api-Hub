@@ -15,6 +15,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `history.md` - Transaction history: ownership timeline, comparable sales, leasing intelligence, enrichment pattern
   - `snapshots.md` - Historical fleet state: getCondensedSnapshot, snapshotdate, non-paged, caching strategy
   - `trends.md` - Market trends & time-series: getModelMarketTrends, composite indicators, data collection architecture
+  - `events.md` - Aircraft events: getEventListPaged, lifecycle changes, market velocity, causal analytics layer
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps

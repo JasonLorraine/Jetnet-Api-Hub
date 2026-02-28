@@ -10,6 +10,7 @@ The JETNET API exposes multiple endpoints that, when combined, form a complete l
 |-------|----------|-----------------|
 | **Market** | `getModelMarketTrends` | Monthly pricing, inventory, days-on-market per model |
 | **State** | `getCondensedSnapshot` | Fleet ownership/operator state at a historical date |
+| **Causal** | `getEventListPaged` | Discrete lifecycle changes explaining why state changed |
 | **Activity** | `getFlightData` / `getFlights` | Flight hours, routes, utilization |
 | **Transaction** | `getHistoryListPaged` | Sales, leases, ownership transfers |
 | **Current** | `getCondensedOwnerOperators` | Current ownership/operator relationships |
@@ -230,6 +231,7 @@ Plot `avg_airframe_time` trends against `avg_asking_price` from market trends. D
 |-------|----------|-----------|
 | Market | `getModelMarketTrends` | Monthly (data updates monthly) |
 | State | `getCondensedSnapshot` | Quarterly or on-demand |
+| Causal | `getEventListPaged` | Daily or hourly for alerts |
 | Activity | `getFlights` | Monthly per aircraft |
 | Transactions | `getHistoryListPaged` | Weekly or daily for alerts |
 | Current | `getCondensedOwnerOperators` | Daily or weekly for CRM sync |
@@ -238,6 +240,7 @@ Plot `avg_airframe_time` trends against `avg_asking_price` from market trends. D
 
 ## See Also
 
+- [Events](events.md) -- discrete lifecycle changes (the causal layer)
 - [Snapshots](snapshots.md) -- historical fleet state endpoint details
 - [History](history.md) -- transaction history endpoint details
 - [Flight Data](flight-data.md) -- flight activity endpoint details

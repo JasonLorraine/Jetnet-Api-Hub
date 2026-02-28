@@ -216,7 +216,25 @@ Derived metrics:
 - Liquidity Score = inverse of avg_daysonmarket slope
 - Price Trend Index = MoM change in avg_asking_price
 
-Combine with Snapshots (state), History (transactions), and Flight Data (utilization) for full longitudinal analytics. See docs/trends.md for composite indicators and architecture.
+Combine with Snapshots (state), History (transactions), Events (causal), and Flight Data (utilization) for full longitudinal analytics. See docs/trends.md for composite indicators and architecture.
+
+## Events (getEventListPaged)
+
+POST /api/Aircraft/getEventListPaged/{apiToken}/{pagesize}/{page}
+
+Discrete, timestamped aircraft lifecycle changes. The atomic causal layer of the dataset.
+
+Request: evcategory (array), evtype (array), startdate/enddate (MM/DD/YYYY), aclist, modlist.
+Response key: `events` (array). Fields: aircraftid, make, model, sernbr, regnbr, yearmfr, date (ISO), subject, description.
+
+Key behaviors:
+- evcategory and evtype enum values are STRICT. Unrecognized values return errors inside responsestatus (HTTP 200).
+- Use [] for both evcategory and evtype to return all events (safest default).
+- Call GET /api/Utility/getEventCategories/{apiToken} and POST /api/Utility/getEventTypes/{apiToken} to discover valid values.
+- Events explain WHY snapshots and trends changed (ownership transfers, listings, accidents, lifecycle transitions).
+- Use for: lifecycle timelines, market velocity, ownership churn, pre-listing detection, event-driven alerts.
+
+Analytics stack: EVENTS (raw) -> SNAPSHOTS (state) -> TRENDS (analytics).
 
 ## Flight Data Endpoints
 
@@ -253,6 +271,7 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 | docs/history.md | Transaction history: ownership timeline, sales, leases | Markdown |
 | docs/snapshots.md | Historical fleet state at a point in time | Markdown |
 | docs/trends.md | Market trends & time-series analytics | Markdown |
+| docs/events.md | Aircraft events: lifecycle changes, causal layer | Markdown |
 | docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |
