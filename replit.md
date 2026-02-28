@@ -30,6 +30,11 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
 - `examples/python/` - 8 Python examples (requests + Flask)
 - `examples/javascript/` - 8 JavaScript examples (fetch + Express)
 - `examples/responses/` - 16 known-good JSON response examples from v5 (tail-lookup, bulk-export, history, relationships, etc.)
+- `mcp/` - MCP server for AI agent integration (Claude Desktop, Cursor, Copilot)
+  - `jetnet_mcp.py` - Python MCP server: 8 tools (golden_path, lookup, relationships, flights, fleet search, history, trends, model search)
+  - `README.md` - MCP setup, tool reference, example conversations, architecture
+  - `requirements.txt` - mcp>=1.0.0, httpx>=0.27.0, pydantic>=2.0.0
+  - `claude_desktop_config.example.json` - Example config for Claude Desktop
 - `evals/` - AI eval test cases (evals.json)
 - `scripts/` - Production-ready utilities
   - `paginate.py` - Generic pagination helper for all paged endpoints

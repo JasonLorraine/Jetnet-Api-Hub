@@ -354,6 +354,27 @@ getCountryList / getStateList -- Geographic reference. Cache: static.
 
 Strategy: load all static endpoints once at startup, cache long-lived weekly, refresh session-level daily.
 
+## MCP Server (AI Agent Integration)
+
+The `mcp/` directory contains a Model Context Protocol server that lets AI agents
+(Claude Desktop, Cursor, Copilot) query JETNET data natively via tool calls.
+
+Install: pip install mcp httpx pydantic
+Run (stdio): JETNET_EMAIL=... JETNET_PASSWORD=... python mcp/jetnet_mcp.py
+Run (HTTP): TRANSPORT=http PORT=8000 JETNET_EMAIL=... JETNET_PASSWORD=... python mcp/jetnet_mcp.py
+
+8 tools exposed:
+  jetnet_golden_path -- Complete aircraft profile (tail → specs + owner + pictures) in one call.
+  jetnet_lookup_aircraft -- Tail number lookup, returns aircraftid for subsequent calls.
+  jetnet_get_relationships -- Owner/operator/manager relationships for an aircraft.
+  jetnet_get_flight_data -- Flight activity within a date range.
+  jetnet_search_fleet -- Search fleet by model, for-sale status, country.
+  jetnet_get_history -- Transaction history (sales, deliveries) by model/aircraft + date range.
+  jetnet_get_market_trends -- Market analytics: for-sale count, avg price, days on market.
+  jetnet_search_models -- Find AMODID values by name/make/ICAO code.
+
+All tools handle auth, token refresh (50 min), pagination, responsestatus checks, and date validation automatically.
+
 ## File Manifest
 
 | File | Purpose | Format |
@@ -386,3 +407,5 @@ Strategy: load all static endpoints once at startup, cache long-lived weekly, re
 | references/endpoints.md | Full endpoint reference | Markdown |
 | examples/responses/ | 16 known-good JSON response examples | JSON |
 | prompts/ | 4 AI system prompts (Cursor/Copilot format) | Markdown |
+| mcp/jetnet_mcp.py | MCP server: 8 tools for AI agents (Claude, Cursor, Copilot) | Python |
+| mcp/README.md | MCP setup, tool reference, example conversations | Markdown |

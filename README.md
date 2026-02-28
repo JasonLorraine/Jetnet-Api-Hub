@@ -208,6 +208,12 @@ jetnet-api-docs/
 │   ├── 03_fleet_watchlist_alerts.md
 │   └── 04_bulk_export_pipeline.md
 │
+├── mcp/                               ← MCP server (AI agent integration)
+│   ├── jetnet_mcp.py                 ← Python MCP server (stdio + HTTP)
+│   ├── README.md                     ← MCP setup, tools, examples
+│   ├── requirements.txt             ← mcp, httpx, pydantic
+│   └── claude_desktop_config.example.json
+│
 ├── evals/                             ← AI eval test cases
 │   └── evals.json
 │
@@ -287,6 +293,7 @@ See the full working implementation:
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |
+| [MCP Server](mcp/README.md) | AI agent integration: 8 tools for Claude Desktop, Cursor, Copilot |
 
 ---
 

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "jetnet": {
+      "command": "python",
+      "args": ["/absolute/path/to/jetnet_mcp.py"],
+      "env": {
+        "JETNET_EMAIL": "your_email@example.com",
+        "JETNET_PASSWORD": "your_password"
+      }
+    }
+  }
+}
