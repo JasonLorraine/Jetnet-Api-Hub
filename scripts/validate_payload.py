@@ -19,6 +19,8 @@ Usage:
 """
 
 from datetime import datetime
+import json
+import os
 import re
 
 # Valid enum values
@@ -61,6 +63,24 @@ RESPONSE_KEYS = {
     "getPictures":                           "pictures",
     "getAcCompanyFractionalReportPaged":     "aircraftcompfractionalrefs",
 }
+
+
+_MODEL_ID_CACHE = None
+
+def _load_known_model_ids():
+    global _MODEL_ID_CACHE
+    if _MODEL_ID_CACHE is not None:
+        return _MODEL_ID_CACHE
+    table_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "references", "model-id-table.json")
+    if not os.path.exists(table_path):
+        return None
+    try:
+        with open(table_path) as f:
+            data = json.load(f)
+        _MODEL_ID_CACHE = {m["amodid"] for m in data}
+        return _MODEL_ID_CACHE
+    except Exception:
+        return None
 
 
 def _check_date(value: str, field: str, errors: list):
@@ -156,6 +176,15 @@ def validate(endpoint_name: str, payload: dict) -> list:
             errors.append(f"'modlist' must be a list, got {type(ml).__name__}")
         elif any(not isinstance(x, int) for x in ml):
             errors.append("'modlist' must be a list of integers (model IDs)")
+        elif ml:
+            known = _load_known_model_ids()
+            if known is not None:
+                unknown = [x for x in ml if x not in known]
+                if unknown:
+                    errors.append(
+                        f"'modlist': ID(s) {unknown} not found in references/model-id-table.json. "
+                        f"Run 'python scripts/model_search.py' to find valid IDs."
+                    )
 
     if "aclist" in payload:
         al = payload["aclist"]

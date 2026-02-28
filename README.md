@@ -184,9 +184,13 @@ jetnet-api-docs/
 ├── scripts/                            ← Production-ready helper utilities
 │   ├── paginate.py                     ← Generic pagination helper
 │   ├── validate_payload.py            ← Payload validator (catches mistakes)
-│   └── token_probe.py                 ← Measure actual token TTL
+│   ├── token_probe.py                 ← Measure actual token TTL
+│   └── model_search.py               ← Search model IDs by make/model/ICAO
 │
 └── references/                         ← Complete reference material
+    ├── model-ids.md                   ← Model ID lookup (872 models, grouped by type)
+    ├── model-id-table.json            ← Machine-readable model reference (872 entries)
+    ├── model-id-table.csv             ← Same data in CSV for spreadsheets
     ├── endpoints.md                    ← Every endpoint with parameters
     ├── vertical-playbooks.md          ← Industry-specific workflows
     └── buildkit.md                    ← App builder guide (Node + Python)
@@ -360,6 +364,21 @@ for e in errors:
     print(f"  ERROR: {e}")
 ```
 
+### [`scripts/model_search.py`](scripts/model_search.py)
+
+Search the JETNET model-ID reference table. Find the `AMODID` values to use in `modlist`.
+
+```bash
+python scripts/model_search.py "G550"
+#   AMODID=278  GULFSTREAM G550  ICAO=GLF5  Business Jet  fleet=622
+
+python scripts/model_search.py "citation"
+#   37 models found, with ready-to-use modlist array
+
+python scripts/model_search.py
+# Interactive mode -- type, see results, repeat
+```
+
 ### [`scripts/token_probe.py`](scripts/token_probe.py)
 
 Measures the practical token TTL for your account by polling `/getAccountInfo` until failure.
@@ -376,6 +395,9 @@ python scripts/token_probe.py
 
 | Reference | Description |
 |-----------|-------------|
+| [Model ID Lookup](references/model-ids.md) | 872 aircraft models with AMODID values for `modlist` -- grouped by type |
+| [Model ID Table (JSON)](references/model-id-table.json) | Machine-readable model reference for scripts and apps |
+| [Model ID Table (CSV)](references/model-id-table.csv) | Same data in CSV for Excel/spreadsheet users |
 | [Full Endpoint Reference](references/endpoints.md) | Every endpoint with all parameters |
 | [Vertical Playbooks](references/vertical-playbooks.md) | Industry workflows (brokerage, OEM, FBO, MRO, finance, charter) |
 | [Build Kit](references/buildkit.md) | App builder guide with full Node.js + Python examples |

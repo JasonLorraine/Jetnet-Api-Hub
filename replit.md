@@ -22,7 +22,11 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `paginate.py` - Generic pagination helper for all paged endpoints
   - `validate_payload.py` - Payload validator (catches common mistakes before sending)
   - `token_probe.py` - Standalone token lifetime measurement script (polls /getAccountInfo until failure)
-- `references/` - Complete endpoint reference, vertical playbooks, buildkit
+  - `model_search.py` - CLI search tool for model IDs (by make, model, or ICAO type)
+- `references/` - Complete endpoint reference, vertical playbooks, buildkit, model ID lookup
+  - `model-ids.md` - 872 aircraft models with AMODID values for modlist, grouped by maketype
+  - `model-id-table.json` - Machine-readable deduplicated model reference (872 entries with fleet counts)
+  - `model-id-table.csv` - Same data in CSV for spreadsheet users
 - `snippets/` - Quick reference snippets (fleet, ownership, usage, specs, valuation)
 
 ## Key Technical Details
@@ -37,6 +41,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
 - **HTTP 200 != success:** Always check `responsestatus` for `"ERROR"` or `"INVALID"`
 - **Schema differences:** `companyrelation` (getRegNumber flat) vs `relationtype` (getRelationships nested); `forsale: "Y"/"N"` in bulk export vs `forsale: "true"/"false"` in getAircraftList
 - **transtype:** Use `["None"]` not `[]` for all transaction types
+- **Model IDs (AMODID):** 872 unique model IDs from the master table; used in `modlist` arrays. 5 make types: Business Jet (268), Turboprop (186), Jet Airliner (252), Turbine/Helicopter (127), Piston (39). 67 unique makes. Airframe types: F=FixedWing, R=Rotary. `modlist: []` = no filter (all models). Reference at `references/model-id-table.json`
 
 ## Dependencies
 - Python 3.11 (requests, flask)
