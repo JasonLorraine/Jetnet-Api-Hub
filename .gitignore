@@ -1,3 +1,15 @@
+# Replit internal files
+.replit
+replit.nix
+.config/
+.upm/
+.pythonlibs/
+.local/
+.breakpoints
+
+# Uploaded raw assets (not for public repo)
+attached_assets/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
