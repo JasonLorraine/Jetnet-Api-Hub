@@ -4,6 +4,17 @@
 > Swagger: https://customer.jetnetconnect.com/swagger/index.html
 > This file is optimized for LLM context windows. For the full reference, see llms-full.txt.
 
+## Common Use Cases
+
+- Aircraft Sales & Brokerage: tail lookup, owner identification, for-sale inventory, comparable sales history
+- Fleet Intelligence: fleet composition by model/country/operator, ownership tracking, lifecycle monitoring
+- Market Analytics: pricing trends, inventory levels, days-on-market, supply/demand time-series
+- CRM Enrichment: ownership contacts, flight activity, base airport, charter/fractional identification
+- Data Integration: bulk export with delta sync, automated ownership change alerts, transaction monitoring
+- Valuation & Diligence: market benchmarks, transaction history, utilization data, operating costs
+
+See references/vertical-playbooks.md for 9 detailed industry-specific workflows.
+
 ## Authentication
 
 POST /api/Admin/APILogin

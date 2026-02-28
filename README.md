@@ -20,6 +20,7 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 - [Repository Structure](#repository-structure)
 - [The Golden Path](#the-golden-path)
 - [Documentation](#documentation)
+- [Use Cases](#use-cases)
 - [Templates](#templates)
 - [Prompts (AI-Native)](#prompts-ai-native)
 - [Code Examples](#code-examples)
@@ -274,6 +275,54 @@ See the full working implementation:
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |
+
+---
+
+## Use Cases
+
+What people build with the JETNET API. For detailed industry-specific workflows, see [Vertical Playbooks](references/vertical-playbooks.md).
+
+### Aircraft Sales & Brokerage
+
+Research a tail number, identify owners and decision-makers, check if an aircraft is for sale, review asking prices, and pull transaction history for comparable sales.
+
+**Endpoints:** `getRegNumber`, `getRelationships`, `getAircraftList` (forsale filter), `getHistoryListPaged`, `getContacts`
+**Docs:** [History](docs/history.md) | [Response Shapes](docs/response-shapes.md) | [Enum Reference](docs/enum-reference.md)
+
+### Fleet Intelligence & Monitoring
+
+Track fleet composition by model, manufacturer, country, or operator. Monitor ownership changes, lifecycle transitions, and aircraft movements over time.
+
+**Endpoints:** `getCondensedSnapshot`, `getCondensedOwnerOperators`, `getBulkAircraftExportPaged`, `getHistoryListPaged`
+**Docs:** [Snapshots](docs/snapshots.md) | [Bulk Export](docs/bulk-export.md) | [History](docs/history.md)
+
+### Market Analytics & Trends
+
+Build time-series dashboards for pricing, inventory levels, days-on-market, and supply/demand dynamics. Compare fleet composition across years.
+
+**Endpoints:** `getModelMarketTrends`, `getCondensedSnapshot`, `getFlights`
+**Docs:** [Trends](docs/trends.md) | [Snapshots](docs/snapshots.md) | [Flight Data](docs/flight-data.md)
+
+### CRM Enrichment & Lead Generation
+
+Enrich CRM records with aircraft ownership, operator contacts, flight activity, and base airport. Identify charter operators, fractional owners, and FBO prospects.
+
+**Endpoints:** `getRelationships`, `getContacts`, `getFlightDataPaged`, `getAcCompanyFractionalReportPaged`
+**Docs:** [Response Shapes](docs/response-shapes.md) | [Flight Data](docs/flight-data.md) | [ID System](docs/id-system.md)
+
+### Data Integration & Automation
+
+Replicate the JETNET dataset into a local database with initial snapshot + incremental delta sync. Automate alerts for ownership changes, new listings, and transaction activity.
+
+**Endpoints:** `getBulkAircraftExportPaged` (snapshot + delta), `getHistoryListPaged`, `getCondensedOwnerOperators`
+**Docs:** [Bulk Export](docs/bulk-export.md) | [History](docs/history.md) | [Pagination](docs/pagination.md)
+
+### Valuation & Investment Diligence
+
+Benchmark aircraft valuations against market data -- asking prices, transaction history, fleet utilization, days-on-market, and comparable sales.
+
+**Endpoints:** `getModelMarketTrends`, `getHistoryListPaged`, `getFlights`, `getModelOperationCosts`
+**Docs:** [Trends](docs/trends.md) | [History](docs/history.md) | [Flight Data](docs/flight-data.md)
 
 ---
 
