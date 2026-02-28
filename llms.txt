@@ -135,6 +135,24 @@ ContactCard: contactId, firstName, lastName, title, email, phone
 
 GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, categorySize, weightClass, forSale, askingPrice, owner, operator, chiefPilot, baseIcao, baseAirport, baseCountry, dataSource="JETNET"
 
+## Bulk Export (getBulkAircraftExportPaged)
+
+Two operating modes:
+- Snapshot: omit `aircraftchanges` -> full dataset matching filters
+- Delta: `aircraftchanges=true` + `actiondate` -> aircraft with changes since that timestamp
+
+Key behaviors:
+- Delta uses graph-based change detection: aircraft qualifies if ANY related entity changes (ownership, contacts, events, flights) -- not just the aircraft record.
+- Delta returns full records, not field-level diffs. Always upsert entire records.
+- `actiondate` is a watermark/cursor. Accepts `MM/DD/YYYY HH:MM:SS` for hourly polling.
+- Entity counts scale nonlinearly: each aircraft expands into companies, contacts, phones, events, flight summaries.
+- Always scope with `modlist` or `aclist`. Unbounded queries create massive payloads.
+- Response uses flat prefixed schema: owr* (owner), opr* (operator), chp* (chief pilot).
+- `forsale` is "Y"/"N" (not "true"/"false"). `datepurchased` is YYYYMMDD.
+- `maxpages: 0` = single page. Use max(maxpages, 1).
+
+Integration pattern: initial full snapshot -> store locally -> periodic delta pulls with aircraftchanges=true -> upsert entire records.
+
 ## Flight Data Endpoints
 
 Two endpoints for flight intelligence:
@@ -166,6 +184,7 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 | docs/common-mistakes.md | Every known gotcha | Markdown |
 | docs/enum-reference.md | Valid enum values | Markdown |
 | docs/authentication.md | Auth deep dive | Markdown |
+| docs/bulk-export.md | Bulk export: snapshot/delta, graph change detection | Markdown |
 | docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |

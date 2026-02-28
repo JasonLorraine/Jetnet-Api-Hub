@@ -11,6 +11,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `session.py` - Python: SessionState dataclass, login(), ensure_session(), jetnet_request(), normalize_error(), refresh_session()
   - `session.ts` - TypeScript: login(), ensureSession(), jetnetRequest(), normalizeError(), refreshAndRequest()
 - `docs/` - Core documentation (auth, pagination, response handling, response shapes, flight data, IDs, common mistakes, enums)
+  - `bulk-export.md` - Bulk export: snapshot vs delta mode, graph-based change detection, actiondate watermark, entity scaling, integration pattern
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps
