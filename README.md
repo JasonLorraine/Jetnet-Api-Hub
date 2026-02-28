@@ -6,6 +6,7 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 **Swagger:** `https://customer.jetnetconnect.com/swagger/index.html`
 
 > **New here?** Go to **[START_HERE.md](START_HERE.md)** -- pick your path and get running in minutes.
+> Demo UI | Bulk Data | CRM Enrichment | **AI Agent / Code Agent**
 
 ---
 

@@ -70,6 +70,37 @@ You want to enrich contacts, generate leads, or monitor ownership changes.
 
 ---
 
+### Path D: "I'm building an AI agent / code agent"
+
+You want to give an AI agent (Cursor, Copilot, custom GPT, LangChain, CrewAI, or your own) the ability to call the JETNET API.
+
+1. **Feed your agent the rules:** Copy [`src/jetnet/session.py`](src/jetnet/session.py) (Python) or [`src/jetnet/session.ts`](src/jetnet/session.ts) (TypeScript) into your agent's context -- it handles auth, token refresh, and error normalization automatically
+2. **Give it the model reference:** Load [`references/model-id-table.json`](references/model-id-table.json) so your agent can resolve aircraft makes/models to the correct `modlist` IDs (872 models across 67 makes)
+3. **Use the prompt recipes:** Paste any of the [`prompts/`](prompts/) into your agent as system instructions -- they are self-contained with API call sequences, error rules, and response shapes
+4. **Validate with evals:** Use [`evals/evals.json`](evals/evals.json) to test that your agent handles JETNET responses correctly
+5. **Normalize responses:** Use the contracts in [`docs/response-shapes.md`](docs/response-shapes.md) to ensure your agent outputs consistent shapes (AircraftCard, CompanyCard, GoldenPathResult)
+
+**Key files for agent context windows:**
+
+| File | Purpose | Size |
+|------|---------|------|
+| [`src/jetnet/session.py`](src/jetnet/session.py) | Auth + session management (drop into agent) | ~150 lines |
+| [`references/model-id-table.json`](references/model-id-table.json) | Model ID lookup (agent can resolve "G550" → modlist: [278]) | 872 entries |
+| [`docs/response-shapes.md`](docs/response-shapes.md) | Response contracts for structured output | ~200 lines |
+| [`docs/common-mistakes.md`](docs/common-mistakes.md) | Guardrails to prevent agent errors | ~100 lines |
+| [`evals/evals.json`](evals/evals.json) | Test cases for agent validation | ~50 cases |
+| [`prompts/`](prompts/) | 4 ready-to-use system prompts | ~200 lines each |
+
+**Quick agent setup pattern:**
+
+```python
+system_prompt = open("prompts/01_golden_path_tail_lookup_app.md").read()
+model_ids = json.load(open("references/model-id-table.json"))
+common_mistakes = open("docs/common-mistakes.md").read()
+```
+
+---
+
 ## Session Helpers
 
 We provide production-ready session modules that handle login, token refresh, and validation automatically:
@@ -89,4 +120,6 @@ These use `/api/Admin/getAccountInfo` as a lightweight health check to validate 
 | [Response Shapes](docs/response-shapes.md) | Normalized objects for your UI (AircraftCard, CompanyCard, etc.) |
 | [Common Mistakes](docs/common-mistakes.md) | Save yourself hours of debugging |
 | [Prompts](prompts/) | Paste into Cursor/Copilot to generate working apps |
+| [Model ID Lookup](references/model-ids.md) | Find the right `modlist` IDs for any aircraft make/model |
+| [Evals](evals/evals.json) | Test cases for validating AI agent responses |
 | [Full Endpoint Reference](references/endpoints.md) | Every endpoint with all parameters |
