@@ -155,6 +155,7 @@ jetnet-api-docs/
 │   ├── response-handling.md            ← Response structure, schema differences
 │   ├── response-shapes.md             ← Normalized UI contracts (AircraftCard, etc.)
 │   ├── id-system.md                    ← aircraftid vs regnbr vs modelid
+│   ├── flight-data.md                 ← Flight activity & monthly utilization
 │   ├── common-mistakes.md              ← Every gotcha and how to fix it
 │   └── enum-reference.md              ← Valid values for every enum field
 │
@@ -233,6 +234,7 @@ See the full working implementation:
 | [Pagination](docs/pagination.md) | Paged endpoints, loop patterns, maxpages quirks |
 | [Response Handling](docs/response-handling.md) | Response structure, schema differences by endpoint |
 | [Response Shapes](docs/response-shapes.md) | Normalized UI contracts: AircraftCard, CompanyCard, GoldenPathResult |
+| [Flight Data](docs/flight-data.md) | Flight activity + monthly utilization: getFlightData vs getFlights |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |

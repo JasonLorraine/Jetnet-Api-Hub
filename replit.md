@@ -10,7 +10,8 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
 - `src/jetnet/` - Session helpers (Python + TypeScript) with auto-refresh and /getAccountInfo validation
   - `session.py` - Python: SessionState dataclass, login(), ensure_session(), jetnet_request(), normalize_error(), refresh_session()
   - `session.ts` - TypeScript: login(), ensureSession(), jetnetRequest(), normalizeError(), refreshAndRequest()
-- `docs/` - Core documentation (auth, pagination, response handling, response shapes, IDs, common mistakes, enums)
+- `docs/` - Core documentation (auth, pagination, response handling, response shapes, flight data, IDs, common mistakes, enums)
+  - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps
   - `nextjs-tail-lookup/` - Next.js 14 App Router + Tailwind: lib/jetnet.ts, lib/normalize.ts, app/api/aircraft/route.ts (POST), app/page.tsx

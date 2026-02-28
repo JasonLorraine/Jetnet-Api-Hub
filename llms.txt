@@ -135,6 +135,22 @@ ContactCard: contactId, firstName, lastName, title, email, phone
 
 GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, categorySize, weightClass, forSale, askingPrice, owner, operator, chiefPilot, baseIcao, baseAirport, baseCountry, dataSource="JETNET"
 
+## Flight Data Endpoints
+
+Two endpoints for flight intelligence:
+
+getFlightData (POST, paged) -- Granular per-flight records. Response key: flightdata.
+  Required filters: startdate/enddate (MM/DD/YYYY), plus modlist or aclist.
+  Fields: flightid, flightdate, origin, destination, flighttime, distance, estfuelburn, estCO2emissions, callsign.
+  Ingestion strategy: batch by model + daily/weekly date windows.
+
+getFlights (GET) -- GET /api/Aircraft/getFlights/{aircraftId}/{apiToken}
+  Monthly utilization aggregates: flightyear, flightmonth, flights (count), flighthours.
+  Response key: flights.
+  Use for: utilization trends, CRM scoring, benchmarking.
+
+Use getFlightData for route intelligence and emissions. Use getFlights for monthly trend analysis.
+
 ## File Manifest
 
 | File | Purpose | Format |
@@ -150,6 +166,7 @@ GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, c
 | docs/common-mistakes.md | Every known gotcha | Markdown |
 | docs/enum-reference.md | Valid enum values | Markdown |
 | docs/authentication.md | Auth deep dive | Markdown |
+| docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |
 | docs/id-system.md | ID types and usage | Markdown |
