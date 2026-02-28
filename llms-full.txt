@@ -166,6 +166,41 @@ Key behaviors:
 
 Integration pattern: initial full snapshot -> store locally -> periodic delta pulls with aircraftchanges=true -> upsert entire records.
 
+## History Endpoints (getHistoryListPaged / getCompanyHistoryPaged)
+
+History records are transaction EVENTS, not aircraft state. Each record = a sale, lease, transfer, or relationship change.
+
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pagesize}/{page}
+POST /api/Company/getCompanyHistoryPaged/{apiToken}/{pagesize}/{page}
+
+Key behaviors:
+- Response key: `history` (array). Uses nested relationship schema (company:{}, contact:{} sub-objects).
+- `transtype` in request = categories ("FullSale", "Lease", "None"); in response = descriptive strings ("Full Sale - Retail to Retail").
+- `isnewaircraft` and `isinternaltrans` are tristate: "Yes", "No", "Ignore".
+- `allrelationships: true` returns all parties: Seller, Purchaser, Operator, Seller's Broker, Purchaser's Broker.
+- `soldprice`/`askingprice` are often null (confidential deals). `transretail: true` = arm's length retail transaction.
+- `transdate` = actual transaction date. `actiondate` = when JETNET last updated the record.
+- History records are event pointers — enrich with getRelationships/getAircraftList/getCompany for full context.
+- Always provide startdate/enddate + modelid/modlist/companyid to bound queries.
+
+Use cases: ownership timeline (sort by transdate ASC), comparable sales (transtype=FullSale + transretail), leasing intelligence, change detection alerts.
+
+## Snapshot Endpoint (getCondensedSnapshot)
+
+Returns frozen fleet ownership/operator state at a specific historical date. A "time machine" for fleet composition.
+
+POST /api/Aircraft/getCondensedSnapshot/{apiToken}
+
+Key behaviors:
+- `snapshotdate` (MM/DD/YYYY) is the required defining parameter.
+- Response key: `snapshotowneroperators` (array).
+- Non-paged: returns full dataset in one response (can be multi-MB).
+- Always filter by modlist, basecountry, maketype, or aclist to keep payloads manageable.
+- Snapshot data is historical and immutable — cache aggressively.
+- Conceptual model: Snapshot=STATE, History=CHANGE, Current=NOW, FlightData=ACTIVITY.
+
+Use cases: historical fleet composition, "who owned this in year X?", market comparison across years, country fleet growth analysis.
+
 ## Flight Data Endpoints
 
 Two endpoints for flight intelligence:
@@ -198,6 +233,8 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 | docs/enum-reference.md | Valid enum values | Markdown |
 | docs/authentication.md | Auth deep dive | Markdown |
 | docs/bulk-export.md | Bulk export: snapshot/delta, graph change detection | Markdown |
+| docs/history.md | Transaction history: ownership timeline, sales, leases | Markdown |
+| docs/snapshots.md | Historical fleet state at a point in time | Markdown |
 | docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |
@@ -1349,6 +1386,575 @@ Other bulk export quirks:
 - `actiondate` accepts `MM/DD/YYYY HH:MM:SS` for hourly polling windows
 
 See [Common Mistakes](common-mistakes.md) and [Pagination](pagination.md) for details on these quirks.
+
+---
+
+## === Aircraft History (docs/history.md) ===
+
+# JETNET Aircraft History Endpoints
+
+## Conceptual Model
+
+History endpoints return **transaction events**, not aircraft state. Each record represents a discrete ownership or leasing event -- a sale, lease, transfer, or relationship change.
+
+```
+Aircraft Timeline = Ordered Set of Transactions
+
+2019-03  Full Sale — Company A → Company B
+2021-07  Lease — Company B → Company C
+2024-01  Full Sale — Company C → Company D
+```
+
+This is fundamentally different from other endpoint types:
+
+| Endpoint Type | What It Returns | Use Case |
+|---------------|----------------|----------|
+| Aircraft / Bulk Export | Current state | "Who owns this now?" |
+| Snapshot | State at a historical date | "Who owned this in 2016?" |
+| History | Change events over time | "When was this sold? To whom?" |
+| Flight Data | Operational activity | "How many hours did it fly?" |
+
+---
+
+## Endpoints
+
+### Aircraft History
+
+```
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pagesize}/{page}
+```
+
+Returns transaction records filtered by aircraft attributes, model, company, and transaction type.
+
+### Company History
+
+```
+POST /api/Company/getCompanyHistoryPaged/{apiToken}/{pagesize}/{page}
+```
+
+Returns transaction history for a specific company. Use when the question is "What aircraft has this company bought/sold?" rather than "What happened to this aircraft?"
+
+---
+
+## Request Structure
+
+```json
+{
+  "aircraftid": 0,
+  "airframetype": "None",
+  "maketype": "None",
+  "make": "",
+  "modelid": 0,
+  "modlist": [1194],
+  "aclist": [],
+  "companyid": 0,
+  "isnewaircraft": "No",
+  "isinternaltrans": "No",
+  "allrelationships": true,
+  "transtype": ["FullSale", "Lease"],
+  "startdate": "08/22/2025",
+  "enddate": "02/18/2026"
+}
+```
+
+### Filter Parameters
+
+**Aircraft identification:**
+
+| Field | Purpose |
+|-------|---------|
+| `aircraftid` | Single aircraft lookup (0 = no filter) |
+| `make` | Manufacturer filter (case-insensitive) |
+| `modelid` | Single model ID |
+| `modlist` | Array of model IDs for multi-model queries |
+| `aclist` | Array of aircraft IDs |
+| `airframetype` | `"FixedWing"`, `"Rotorcraft"`, `"None"` |
+| `maketype` | `"BusinessJet"`, `"Turboprop"`, `"None"` |
+
+**Transaction filters:**
+
+| Field | Purpose | Values |
+|-------|---------|--------|
+| `transtype` | Transaction categories | `["None"]` (all), `["FullSale"]`, `["Lease"]`, `["InternalSale"]`, `["Management"]`, `["Insurance"]`, `["Repossession"]`, `["Registration"]` |
+| `isnewaircraft` | Include factory-new deliveries | `"Yes"`, `"No"`, `"Ignore"` |
+| `isinternaltrans` | Include intra-company transfers | `"Yes"`, `"No"`, `"Ignore"` |
+| `allrelationships` | Return all parties (Seller, Purchaser, Brokers) | `true` / `false` |
+
+**Company / relationship:**
+
+| Field | Purpose |
+|-------|---------|
+| `companyid` | History tied to a specific company (0 = no filter) |
+| `allrelationships` | Include all ownership/operator relationships |
+
+**Date range:**
+
+| Field | Purpose |
+|-------|---------|
+| `startdate` | Beginning of history window (`MM/DD/YYYY`) |
+| `enddate` | End of history window (`MM/DD/YYYY`) |
+
+Date filtering is critical for performance. Always provide a bounded date range.
+
+---
+
+## Response Structure
+
+Response key: **`history`** (array)
+
+```json
+{
+  "responseid": "556111434",
+  "responsestatus": "SUCCESS: PAGE [ 1 of 428 ]",
+  "count": 38,
+  "currentpage": 1,
+  "maxpages": 428,
+  "history": [
+    {
+      "aircraftid": 246204,
+      "transid": 31305852,
+      "modelid": 1194,
+      "make": "CITATION",
+      "model": "CJ3+",
+      "sernbr": "525B-0739",
+      "regnbr": "F-HVLE",
+      "yearmfr": 2024,
+      "yeardlv": 2025,
+      "maketype": "BusinessJet",
+      "weightclass": "Light",
+      "categorysize": "Light Jet",
+      "transtype": "Full Sale - Retail to Unidentified",
+      "transdate": "2025-08-25T00:00:00",
+      "actiondate": "2025-09-04T15:09:33",
+      "translastactiondate": "2025-09-04T15:09:33",
+      "description": "Sold from AMW Aero to Awaiting Documentation",
+      "internaltrans": false,
+      "newac": "preowned",
+      "transretail": true,
+      "soldprice": null,
+      "askingprice": null,
+      "listdate": "2025-04-10T00:00:00",
+      "purchasedate": "2025-01-16T00:00:00",
+      "usage": "Charter",
+      "forsale": true,
+      "marketstatus": "For Sale",
+      "lifecycle": "InOperation",
+      "basecountry": "France",
+      "basecontinent": "Europe",
+      "estaftt": 76,
+      "estcycles": 17,
+      "companyrelationships": [...]
+    }
+  ]
+}
+```
+
+### Key Response Fields
+
+| Field | Meaning |
+|-------|---------|
+| `transid` | Unique transaction identifier |
+| `transtype` | Descriptive transaction string (not the request category) |
+| `transdate` | Actual transaction date (ISO) |
+| `actiondate` | When JETNET last updated this record (ISO) |
+| `translastactiondate` | Last action timestamp on this transaction |
+| `description` | Human-readable transaction summary |
+| `soldprice` / `askingprice` | Often `null` -- many deals are confidential |
+| `transretail` | `true` = arm's length retail transaction (use for comparable sales) |
+| `internaltrans` | `false` = not an intra-company transfer |
+| `newac` | `"preowned"` or `"new"` |
+| `listdate` | When aircraft was listed for sale |
+| `purchasedate` | When it entered current owner's fleet |
+| `pageurl` | Deep link to JETNET Evolution web detail page |
+
+**Important:** `transtype` values in the **request** are categories (`"FullSale"`), but values in the **response** are descriptive strings (`"Full Sale - Retail to Retail"`, `"Full Sale - Retail to Leasing Company"`, etc.). See [Enum Reference](enum-reference.md) for known values.
+
+### Company Relationships (Nested Schema)
+
+History uses the **nested relationship schema** -- same as `getRelationships`. Each entry contains `company: {}` and `contact: {}` sub-objects with a `relationtype` field.
+
+```json
+{
+  "companyid": 422540,
+  "name": "AMW Aero",
+  "relationtype": "Seller",
+  "company": {
+    "companyid": 422540,
+    "name": "AMW Aero",
+    "address1": "11 Route d Archigny",
+    "city": "Sainte-Radegonde",
+    "country": "France",
+    "email": "Sales02@acimetechnology.fr"
+  },
+  "contact": {
+    "contactid": 606048,
+    "firstname": "Herve",
+    "lastname": "Mouly",
+    "title": "Manager",
+    "email": "herve@amwaero.com"
+  }
+}
+```
+
+History-specific `relationtype` values: `"Seller"`, `"Purchaser"`, `"Operator"`, `"Seller's Broker"`, `"Purchaser's Broker"`.
+
+See [Response Handling](response-handling.md) for the full nested vs flat schema comparison.
+
+---
+
+## History Records Are Event Pointers
+
+History records include aircraft summary fields (make, model, tail, serial) but they are primarily **transaction records**. For full current aircraft state, enrich with other endpoints:
+
+| Need | Endpoint |
+|------|----------|
+| Current ownership / operator details | `getRelationships` |
+| Full aircraft detail | `getAircraftList` or `getRegNumber` |
+| Company detail | `getCompany` |
+| Flight activity | `getFlightDataPaged` |
+
+### Enrichment Pattern
+
+```python
+history = get_all_pages(bearer, token, history_path, history_body)
+
+for record in sorted(history, key=lambda r: r["transdate"]):
+    aircraft_id = record["aircraftid"]
+    
+    relationships = api_post(
+        f"/api/Aircraft/getRelationships/{token}",
+        {"aclist": [aircraft_id], "modlist": []}
+    )
+```
+
+---
+
+## Use Cases
+
+### Ownership Timeline
+
+Query a single aircraft's full transaction history to build a chronological ownership chain:
+
+```json
+{
+  "aircraftid": 125375,
+  "transtype": ["None"],
+  "startdate": "01/01/2010",
+  "enddate": "02/28/2026",
+  "allrelationships": true,
+  "isinternaltrans": "Ignore",
+  "isnewaircraft": "Ignore"
+}
+```
+
+Sort results by `transdate ASC` to produce a timeline.
+
+### Comparable Sales Analysis
+
+Find all retail pre-owned sales for a model in a date window:
+
+```json
+{
+  "modlist": [1194],
+  "transtype": ["FullSale"],
+  "isnewaircraft": "No",
+  "isinternaltrans": "No",
+  "allrelationships": true,
+  "startdate": "01/01/2025",
+  "enddate": "02/28/2026"
+}
+```
+
+Filter results where `transretail: true` for arm's length transactions.
+
+### Leasing Intelligence
+
+Track lease activity for a model segment:
+
+```json
+{
+  "modlist": [278, 288, 663],
+  "transtype": ["Lease"],
+  "startdate": "01/01/2025",
+  "enddate": "02/28/2026",
+  "allrelationships": true
+}
+```
+
+### Change Detection Alerts
+
+Poll periodically with a narrow date window to detect new transactions:
+
+```json
+{
+  "modlist": [278],
+  "transtype": ["None"],
+  "startdate": "02/27/2026",
+  "enddate": "02/28/2026",
+  "allrelationships": true
+}
+```
+
+---
+
+## Performance Notes
+
+- Always provide `startdate` / `enddate` to bound the query
+- Use `modelid`, `modlist`, or `companyid` to limit scope
+- High-activity models (e.g., King Air, Citation CJ series) produce dense result sets
+- `maxpages: 0` / `currentpage: 0` means all results fit in one response -- not an error. See [Pagination](pagination.md) for the `max(maxpages, 1)` pattern.
+
+---
+
+## See Also
+
+- [Response Handling](response-handling.md) -- nested relationship schema details
+- [Enum Reference](enum-reference.md) -- `transtype` request categories and response values
+- [Pagination](pagination.md) -- paged loop patterns and `maxpages: 0` quirk
+- [Snapshots](snapshots.md) -- historical fleet state at a specific date
+- [Flight Data](flight-data.md) -- operational activity (complementary to transaction history)
+- [Common Mistakes](common-mistakes.md) -- known gotchas
+
+---
+
+## === Aircraft Snapshots (docs/snapshots.md) ===
+
+# JETNET Aircraft Snapshot Endpoint
+
+## Conceptual Model
+
+The snapshot endpoint provides a **frozen view of aircraft ownership and operator state at a specific historical date**. Unlike history endpoints (which return transaction events) or live queries (which return current state), snapshots answer:
+
+> "Who owned or operated this aircraft on May 1, 2016?"
+
+Think of it as a database time machine for fleet composition.
+
+```
+Aircraft Timeline
+------------------------------
+2014  Owner A
+2016  Owner B
+2019  Owner C
+
+Snapshot(2016) → Owner B
+History        → [A→B→C transitions]
+Current        → Owner C
+```
+
+| Endpoint Type | Returns | Analogy |
+|---------------|---------|---------|
+| Aircraft / Bulk Export | Current state | "NOW" |
+| Snapshot | State at a historical date | "THEN" |
+| History | Change events over time | "WHAT CHANGED" |
+| Flight Data | Operational activity | "WHAT HAPPENED" |
+
+---
+
+## Endpoint
+
+```
+POST /api/Aircraft/getCondensedSnapshot/{apiToken}
+```
+
+Returns condensed aircraft ownership/operator records as they existed on the requested `snapshotdate`.
+
+**Important:** This endpoint is **non-paged**. It returns the full dataset in a single response, which can be multi-MB for broad queries.
+
+---
+
+## Request Structure
+
+```json
+{
+  "airframetype": "None",
+  "maketype": "None",
+  "sernbr": "",
+  "regnbr": "",
+  "modelid": 0,
+  "make": "",
+  "lifecycle": "None",
+  "basecountry": "Mexico",
+  "snapshotdate": "05/01/2016",
+  "yearmfr": 0,
+  "yeardlv": 0,
+  "aclist": [],
+  "modlist": [],
+  "exactMatchReg": false
+}
+```
+
+### Parameters
+
+**Temporal control (required):**
+
+| Field | Purpose | Format |
+|-------|---------|--------|
+| `snapshotdate` | Historical reference date | `MM/DD/YYYY` |
+
+This is the defining parameter. Everything returned reflects the fleet as it existed on this date.
+
+**Aircraft filters:**
+
+| Field | Purpose |
+|-------|---------|
+| `make` | Manufacturer filter (case-insensitive) |
+| `modelid` | Single model ID (0 = no filter) |
+| `modlist` | Array of model IDs |
+| `aclist` | Array of aircraft IDs |
+| `sernbr` | Serial number filter |
+| `regnbr` | Registration / tail number filter |
+| `exactMatchReg` | `true` for exact match, `false` for partial |
+| `airframetype` | `"FixedWing"`, `"Rotorcraft"`, `"None"` |
+| `maketype` | `"BusinessJet"`, `"Turboprop"`, `"Piston"`, `"None"` |
+
+**Operational filters:**
+
+| Field | Purpose |
+|-------|---------|
+| `lifecycle` | Aircraft operational state (`"InOperation"`, `"None"`) |
+| `basecountry` | Country where aircraft was based |
+| `basestate` | State/region filter (array) |
+| `yearmfr` | Manufacturing year (0 = no filter) |
+| `yeardlv` | Delivery year (0 = no filter) |
+
+---
+
+## Response Structure
+
+Response key: **`snapshotowneroperators`** (array)
+
+```json
+{
+  "responseid": "...",
+  "responsestatus": "SUCCESS",
+  "count": 2651,
+  "snapshotowneroperators": [
+    {
+      "snapshotdate": "5/2016",
+      "acid": 610,
+      "airframetype": "FixedWing",
+      "maketype": "Piston",
+      "make": "BARON",
+      "model": "58"
+    }
+  ]
+}
+```
+
+Each record represents an aircraft + ownership/operator relationship as it existed at the snapshot date.
+
+---
+
+## Performance and Payload Size
+
+Snapshot responses can be large:
+- A country-level query (e.g., all aircraft based in Mexico) can return thousands of records and multi-MB payloads
+- There is **no pagination** -- the full dataset comes in one response
+
+**Always filter** to keep payloads manageable:
+
+| Filter | Effect |
+|--------|--------|
+| `modlist` | Scope to specific models -- most effective |
+| `basecountry` | Limit to a single country |
+| `maketype` | Limit to a category (BusinessJet, Turboprop) |
+| `lifecycle` | Exclude scrapped/stored aircraft |
+| `aclist` | Query specific aircraft only |
+
+Avoid unrestricted global snapshot pulls. A query with no filters against a broad `snapshotdate` produces very large payloads.
+
+---
+
+## Use Cases
+
+### Historical Fleet Composition
+
+"How many G550s were based in the US in 2018?"
+
+```json
+{
+  "modlist": [278],
+  "basecountry": "United States",
+  "snapshotdate": "12/31/2018",
+  "lifecycle": "InOperation"
+}
+```
+
+Count the results to get fleet size at that date.
+
+### "Who Owned This in Year X?"
+
+```json
+{
+  "aclist": [125375],
+  "snapshotdate": "06/15/2020"
+}
+```
+
+### Market Comparison Across Years
+
+Run the same filtered query with different `snapshotdate` values to compare fleet composition over time:
+
+```python
+years = ["12/31/2018", "12/31/2020", "12/31/2022", "12/31/2024"]
+fleet_sizes = {}
+
+for date in years:
+    body = {
+        "modlist": [278],
+        "basecountry": "United States",
+        "snapshotdate": date,
+        "lifecycle": "InOperation",
+        "airframetype": "None",
+        "maketype": "None",
+        "make": "",
+        "modelid": 0,
+        "sernbr": "",
+        "regnbr": "",
+        "yearmfr": 0,
+        "yeardlv": 0,
+        "aclist": [],
+        "exactMatchReg": False
+    }
+    result = api_post(f"/api/Aircraft/getCondensedSnapshot/{token}", body)
+    fleet_sizes[date] = result["count"]
+```
+
+### Country Fleet Growth Analysis
+
+Compare aircraft counts by country across snapshot dates to identify growing or shrinking markets.
+
+---
+
+## Engineering Recommendations
+
+**Caching:** Snapshot data is historical and immutable -- cache aggressively. A snapshot for `05/01/2016` will always return the same data.
+
+**Pre-aggregation:** For dashboards or recurring analytics, pre-aggregate common snapshot dates into summary tables rather than calling the API repeatedly.
+
+**Backend summarization:** Avoid feeding raw multi-MB snapshot payloads directly into conversational AI or LLM prompts. Summarize or aggregate on your backend first.
+
+```
+Application
+  ↓
+Backend Service
+  ↓
+JETNET Snapshot API
+  ↓
+Normalize → Cache → Summarize
+  ↓
+Dashboard / LLM Response
+```
+
+---
+
+## See Also
+
+- [History](history.md) -- transaction change events (complementary to snapshots)
+- [Flight Data](flight-data.md) -- operational activity
+- [Bulk Export](bulk-export.md) -- current state with full relationship graphs
+- [Enum Reference](enum-reference.md) -- valid values for `airframetype`, `maketype`, `lifecycle`
+- [Response Handling](response-handling.md) -- schema differences across endpoints
 
 ---
 

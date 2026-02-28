@@ -156,6 +156,8 @@ jetnet-api-docs/
 │   ├── response-shapes.md             ← Normalized UI contracts (AircraftCard, etc.)
 │   ├── id-system.md                    ← aircraftid vs regnbr vs modelid
 │   ├── bulk-export.md                 ← Bulk export: snapshot/delta, change detection
+│   ├── history.md                     ← Transaction history & ownership timeline
+│   ├── snapshots.md                   ← Historical fleet state at a point in time
 │   ├── flight-data.md                 ← Flight activity & monthly utilization
 │   ├── common-mistakes.md              ← Every gotcha and how to fix it
 │   └── enum-reference.md              ← Valid values for every enum field
@@ -236,6 +238,8 @@ See the full working implementation:
 | [Response Handling](docs/response-handling.md) | Response structure, schema differences by endpoint |
 | [Response Shapes](docs/response-shapes.md) | Normalized UI contracts: AircraftCard, CompanyCard, GoldenPathResult |
 | [Bulk Export](docs/bulk-export.md) | Snapshot vs delta mode, graph-based change detection, integration pattern |
+| [History](docs/history.md) | Transaction events: ownership timeline, comparable sales, leasing intelligence |
+| [Snapshots](docs/snapshots.md) | Historical fleet state at a point in time (`getCondensedSnapshot`) |
 | [Flight Data](docs/flight-data.md) | Flight activity + monthly utilization: getFlightData vs getFlights |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |

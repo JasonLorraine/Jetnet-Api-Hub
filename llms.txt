@@ -154,6 +154,41 @@ Key behaviors:
 
 Integration pattern: initial full snapshot -> store locally -> periodic delta pulls with aircraftchanges=true -> upsert entire records.
 
+## History Endpoints (getHistoryListPaged / getCompanyHistoryPaged)
+
+History records are transaction EVENTS, not aircraft state. Each record = a sale, lease, transfer, or relationship change.
+
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pagesize}/{page}
+POST /api/Company/getCompanyHistoryPaged/{apiToken}/{pagesize}/{page}
+
+Key behaviors:
+- Response key: `history` (array). Uses nested relationship schema (company:{}, contact:{} sub-objects).
+- `transtype` in request = categories ("FullSale", "Lease", "None"); in response = descriptive strings ("Full Sale - Retail to Retail").
+- `isnewaircraft` and `isinternaltrans` are tristate: "Yes", "No", "Ignore".
+- `allrelationships: true` returns all parties: Seller, Purchaser, Operator, Seller's Broker, Purchaser's Broker.
+- `soldprice`/`askingprice` are often null (confidential deals). `transretail: true` = arm's length retail transaction.
+- `transdate` = actual transaction date. `actiondate` = when JETNET last updated the record.
+- History records are event pointers — enrich with getRelationships/getAircraftList/getCompany for full context.
+- Always provide startdate/enddate + modelid/modlist/companyid to bound queries.
+
+Use cases: ownership timeline (sort by transdate ASC), comparable sales (transtype=FullSale + transretail), leasing intelligence, change detection alerts.
+
+## Snapshot Endpoint (getCondensedSnapshot)
+
+Returns frozen fleet ownership/operator state at a specific historical date. A "time machine" for fleet composition.
+
+POST /api/Aircraft/getCondensedSnapshot/{apiToken}
+
+Key behaviors:
+- `snapshotdate` (MM/DD/YYYY) is the required defining parameter.
+- Response key: `snapshotowneroperators` (array).
+- Non-paged: returns full dataset in one response (can be multi-MB).
+- Always filter by modlist, basecountry, maketype, or aclist to keep payloads manageable.
+- Snapshot data is historical and immutable — cache aggressively.
+- Conceptual model: Snapshot=STATE, History=CHANGE, Current=NOW, FlightData=ACTIVITY.
+
+Use cases: historical fleet composition, "who owned this in year X?", market comparison across years, country fleet growth analysis.
+
 ## Flight Data Endpoints
 
 Two endpoints for flight intelligence:
@@ -186,6 +221,8 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 | docs/enum-reference.md | Valid enum values | Markdown |
 | docs/authentication.md | Auth deep dive | Markdown |
 | docs/bulk-export.md | Bulk export: snapshot/delta, graph change detection | Markdown |
+| docs/history.md | Transaction history: ownership timeline, sales, leases | Markdown |
+| docs/snapshots.md | Historical fleet state at a point in time | Markdown |
 | docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |
