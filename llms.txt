@@ -1,0 +1,158 @@
+# JETNET API (Jetnet Connect) -- AI Agent Reference
+
+> Base URL: https://customer.jetnetconnect.com
+> Swagger: https://customer.jetnetconnect.com/swagger/index.html
+> This file is optimized for LLM context windows. For the full reference, see llms-full.txt.
+
+## Authentication
+
+POST /api/Admin/APILogin
+Body: { "emailAddress": "...", "password": "..." }
+Response: { "bearerToken": "...", "apiToken": "..." }
+
+Rules:
+- Field is `emailAddress` (capital A). Not `email`, `emailaddress`, or `email_address`.
+- `bearerToken` goes in header: `Authorization: Bearer {bearerToken}`
+- `apiToken` goes in URL path only: `/api/Aircraft/getRegNumber/N123AB/{apiToken}`
+- Never put apiToken in headers or body. Never put bearerToken in the URL.
+- Tokens expire after 60 minutes. Proactively refresh at 50 minutes.
+- Validate with: GET /api/Admin/getAccountInfo/{apiToken}
+- On "INVALID SECURITY TOKEN": re-login once and retry. Never loop.
+
+## Critical Gotchas
+
+1. HTTP 200 does NOT mean success. Always check `responsestatus` for "ERROR".
+2. `transtype: ["None"]` not `[]` for all transaction types.
+3. `forsale` is string `"true"`/`"false"` in requests, `"Y"`/`"N"` in bulk export responses.
+4. Dates must be `MM/DD/YYYY` with leading zeros. Month first, not day.
+5. `modlist: []` means no filter (all models), not empty results.
+6. `aclist: []` means no filter (all aircraft), not empty results.
+7. `maxpages: 0` from bulk export = single page. Use `max(maxpages, 1)`.
+8. `companyrelation` (getRegNumber flat) vs `relationtype` (getRelationships nested) -- different endpoints use different field names.
+9. `regnbr` (tail number) can change. Use `aircraftid` as your stable database key.
+10. Pagination is 1-based (first page = 1, not 0).
+
+## The Golden Path (Tail Lookup)
+
+1. GET /api/Aircraft/getRegNumber/{tailNumber}/{apiToken} -> aircraftresult (includes aircraftid)
+2. GET /api/Aircraft/getPictures/{aircraftid}/{apiToken} -> pictures[]
+   POST /api/Aircraft/getRelationships/{apiToken} body: {"aclist":[aircraftid],"modlist":[]} -> relationships[]
+   POST /api/Aircraft/getFlightDataPaged/{apiToken}/100/1 body: {"aclist":[aircraftid],"modlist":[],...} -> flightdata[]
+3. POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1 body: {"aclist":[aircraftid],"modlist":[],"transtype":["None"],...} -> history[] (lazy)
+
+All POST endpoints require a JSON body with at minimum aclist and modlist. See prompts/ or docs/ for full payload shapes.
+
+## Response Keys by Endpoint
+
+| Endpoint | Response Key | Type |
+|----------|-------------|------|
+| getRegNumber | aircraftresult | Object |
+| getAircraftList | aircraft | Array |
+| getHistoryListPaged | history | Array |
+| getFlightDataPaged | flightdata | Array |
+| getEventListPaged | events | Array |
+| getRelationships | relationships | Array |
+| getBulkAircraftExport | aircraft | Array |
+| getCondensedOwnerOperators | aircraftowneroperators | Array |
+| getPictures | pictures | Array |
+| getCompanyListPaged | companylist | Array |
+| getContactListPaged | contactlist | Array |
+| getModelMarketTrends | modelMarketTrends | Object |
+| getAcCompanyFractionalReportPaged | aircraftcompfractionalrefs | Array |
+
+## Enum Values
+
+airframetype: None, FixedWing, Rotary
+maketype: None, JetAirliner, BusinessJet, Turboprop, Piston, Turbine
+lifecycle: None, InProduction, NewWithManufacturer, InOperation, Retired, InStorage
+forsale (request): "true", "false", ""
+isnewaircraft / ispreownedtrans / isinternaltrans: Yes, No, Ignore
+transtype (request categories): None, FullSale, Lease, InternalSale, Management, Insurance, Repossession, Registration
+  NOTE: Response transtype values are different (descriptive strings like "Full Sale - Retail to Retail"). Do not use response values in request payloads.
+
+## ID System
+
+| ID | Type | Purpose | Stable? |
+|----|------|---------|---------|
+| aircraftid | int | Primary key for aircraft, join key for all sub-records | Yes |
+| regnbr | string | Tail number (human-readable) | No -- can change |
+| modelid / AMODID | int | Aircraft model, used in modlist arrays | Yes |
+| companyid | int | Company/entity ID | Yes |
+| contactid | int | Person ID | Yes |
+| transid | int | Transaction record ID (for dedup) | Yes |
+| serialnbr | string | Manufacturer serial number | Yes |
+| baseicao | string | Home airport (4-char ICAO code) | Changes |
+
+## Model IDs (modlist)
+
+872 unique model IDs across 67 makes and 5 make types.
+Full machine-readable table: references/model-id-table.json
+
+Common examples:
+- Gulfstream G550: modlist [278]
+- Gulfstream G650 + G650ER: modlist [663, 1211]
+- Citation Latitude: modlist [1167]
+- All Citation CJ3 variants: modlist [279, 1194]
+- Challenger 350: modlist [1188]
+- King Air 350: modlist [142]
+- Bell 407: modlist [100]
+- modlist: [] = no filter (all models)
+
+## Pagination Pattern
+
+URL: POST .../getHistoryListPaged/{apiToken}/{pagesize}/{page}
+Pages are 1-based. Use `maxpages` for loop control.
+
+```python
+results, page = [], 1
+while True:
+    data = api("POST", f"{path}/{pagesize}/{page}", bearer, token, body)
+    for key in ["history","flightdata","events","aircraft","aircraftowneroperators","companylist","contactlist","relationships","aircraftcompfractionalrefs"]:
+        if key in data and isinstance(data[key], list):
+            results.extend(data[key])
+            break
+    if page >= max(data.get("maxpages", 1), 1):
+        break
+    page += 1
+```
+
+## Schema Differences (Owner/Operator)
+
+| Endpoint | Schema | Relation Field |
+|----------|--------|---------------|
+| getRegNumber | Flat: companyname, contactfirstname | companyrelation |
+| getRelationships / getHistoryList | Nested: company.name, contact.firstname | relationtype |
+| getBulkAircraftExport | Prefixed: owrcompanyname, oprcompanyname | prefix (owr*, opr*, chp*) |
+| getAcCompanyFractionalReportPaged | Flat: companyname | relation |
+
+## Normalized Response Shapes
+
+AircraftCard: aircraftId, modelId, tailNumber, serialNumber, make, model, yearMfr, yearDelivered, makeType, airframeType, weightClass, categorySize, lifecycle, forSale, owner (CompanyCard), operator (CompanyCard)
+
+CompanyCard: companyId, name, city, state, country, phone, email, contact (ContactCard)
+
+ContactCard: contactId, firstName, lastName, title, email, phone
+
+GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, categorySize, weightClass, forSale, askingPrice, owner, operator, chiefPilot, baseIcao, baseAirport, baseCountry, dataSource="JETNET"
+
+## File Manifest
+
+| File | Purpose | Format |
+|------|---------|--------|
+| llms.txt | This file -- concise AI agent reference | Markdown |
+| llms-full.txt | Complete reference (all docs concatenated) | Markdown |
+| references/model-id-table.json | 872 model IDs with make/model/ICAO/fleet counts | JSON array |
+| references/model-id-table.csv | Same data for spreadsheets | CSV |
+| evals/evals.json | AI eval test cases | JSON |
+| src/jetnet/session.py | Python session helper (drop into agent) | Python |
+| src/jetnet/session.ts | TypeScript session helper | TypeScript |
+| docs/response-shapes.md | Normalized response contracts with factories | Markdown |
+| docs/common-mistakes.md | Every known gotcha | Markdown |
+| docs/enum-reference.md | Valid enum values | Markdown |
+| docs/authentication.md | Auth deep dive | Markdown |
+| docs/pagination.md | Pagination patterns | Markdown |
+| docs/response-handling.md | Schema differences by endpoint | Markdown |
+| docs/id-system.md | ID types and usage | Markdown |
+| references/endpoints.md | Full endpoint reference | Markdown |
+| examples/responses/ | 16 known-good JSON response examples | JSON |
+| prompts/ | 4 AI system prompts (Cursor/Copilot format) | Markdown |

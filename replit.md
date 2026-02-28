@@ -4,7 +4,9 @@
 A comprehensive public documentation repository for the JETNET API (Jetnet Connect) -- the aviation industry's aircraft intelligence database. Contains documentation, code examples, helper scripts, AI prompts, starter templates, session helpers, and eval test cases. Targets vibe coders, developers, and JETNET API customers.
 
 ## Structure
-- `START_HERE.md` - Choose your adventure entry point (3 paths: demo UI, bulk data, CRM enrichment)
+- `START_HERE.md` - Choose your adventure entry point (4 paths: demo UI, bulk data, CRM enrichment, AI agent)
+- `llms.txt` - Concise AI/LLM reference (~150 lines, fits small context windows)
+- `llms-full.txt` - Complete AI/LLM reference (~3100 lines, all docs concatenated)
 - `src/jetnet/` - Session helpers (Python + TypeScript) with auto-refresh and /getAccountInfo validation
   - `session.py` - Python: SessionState dataclass, login(), ensure_session(), jetnet_request(), normalize_error(), refresh_session()
   - `session.ts` - TypeScript: login(), ensureSession(), jetnetRequest(), normalizeError(), refreshAndRequest()

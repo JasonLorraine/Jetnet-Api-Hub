@@ -7,6 +7,8 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 
 > **New here?** Go to **[START_HERE.md](START_HERE.md)** -- pick your path and get running in minutes.
 > Demo UI | Bulk Data | CRM Enrichment | **AI Agent / Code Agent**
+>
+> **AI / LLM?** Ingest [`llms.txt`](llms.txt) (concise) or [`llms-full.txt`](llms-full.txt) (complete) for your context window.
 
 ---
 
@@ -140,6 +142,8 @@ jetnet-api-docs/
 │
 ├── README.md                           ← You are here
 ├── START_HERE.md                       ← Choose your path (new here? start here)
+├── llms.txt                           ← AI/LLM concise reference (single file)
+├── llms-full.txt                      ← AI/LLM complete reference (all docs)
 │
 ├── src/jetnet/                         ← Session helpers (auto-refresh, validation)
 │   ├── session.py                      ← Python session module

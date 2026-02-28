@@ -8,7 +8,7 @@ Date parameters use `MM/DD/YYYY` format unless noted.
 **Customer APILogin**
 
 **Request body** (`ApiUser`):
-- `emailaddress` (string) -- ApiUser EmailAddress
+- `emailAddress` (string, capital A) -- ApiUser EmailAddress
 - `password` (string) -- ApiUser Password
 
 ---

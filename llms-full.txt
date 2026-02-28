@@ -1,0 +1,3125 @@
+# JETNET API -- Complete AI & Scraper Reference (llms-full.txt)
+
+> This file concatenates all JETNET API documentation into a single file
+> optimized for large LLM context windows and web scrapers.
+> For a concise version, see llms.txt.
+> Machine-readable model IDs: references/model-id-table.json (872 entries)
+> Eval test cases: evals/evals.json
+
+---
+
+## === JETNET API -- Concise AI Reference (llms.txt) ===
+
+# JETNET API (Jetnet Connect) -- AI Agent Reference
+
+> Base URL: https://customer.jetnetconnect.com
+> Swagger: https://customer.jetnetconnect.com/swagger/index.html
+> This file is optimized for LLM context windows. For the full reference, see llms-full.txt.
+
+## Authentication
+
+POST /api/Admin/APILogin
+Body: { "emailAddress": "...", "password": "..." }
+Response: { "bearerToken": "...", "apiToken": "..." }
+
+Rules:
+- Field is `emailAddress` (capital A). Not `email`, `emailaddress`, or `email_address`.
+- `bearerToken` goes in header: `Authorization: Bearer {bearerToken}`
+- `apiToken` goes in URL path only: `/api/Aircraft/getRegNumber/N123AB/{apiToken}`
+- Never put apiToken in headers or body. Never put bearerToken in the URL.
+- Tokens expire after 60 minutes. Proactively refresh at 50 minutes.
+- Validate with: GET /api/Admin/getAccountInfo/{apiToken}
+- On "INVALID SECURITY TOKEN": re-login once and retry. Never loop.
+
+## Critical Gotchas
+
+1. HTTP 200 does NOT mean success. Always check `responsestatus` for "ERROR".
+2. `transtype: ["None"]` not `[]` for all transaction types.
+3. `forsale` is string `"true"`/`"false"` in requests, `"Y"`/`"N"` in bulk export responses.
+4. Dates must be `MM/DD/YYYY` with leading zeros. Month first, not day.
+5. `modlist: []` means no filter (all models), not empty results.
+6. `aclist: []` means no filter (all aircraft), not empty results.
+7. `maxpages: 0` from bulk export = single page. Use `max(maxpages, 1)`.
+8. `companyrelation` (getRegNumber flat) vs `relationtype` (getRelationships nested) -- different endpoints use different field names.
+9. `regnbr` (tail number) can change. Use `aircraftid` as your stable database key.
+10. Pagination is 1-based (first page = 1, not 0).
+
+## The Golden Path (Tail Lookup)
+
+1. GET /api/Aircraft/getRegNumber/{tailNumber}/{apiToken} -> aircraftresult (includes aircraftid)
+2. GET /api/Aircraft/getPictures/{aircraftid}/{apiToken} -> pictures[]
+   POST /api/Aircraft/getRelationships/{apiToken} body: {"aclist":[aircraftid],"modlist":[]} -> relationships[]
+   POST /api/Aircraft/getFlightDataPaged/{apiToken}/100/1 body: {"aclist":[aircraftid],"modlist":[],...} -> flightdata[]
+3. POST /api/Aircraft/getHistoryListPaged/{apiToken}/100/1 body: {"aclist":[aircraftid],"modlist":[],"transtype":["None"],...} -> history[] (lazy)
+
+All POST endpoints require a JSON body with at minimum aclist and modlist. See prompts/ or docs/ for full payload shapes.
+
+## Response Keys by Endpoint
+
+| Endpoint | Response Key | Type |
+|----------|-------------|------|
+| getRegNumber | aircraftresult | Object |
+| getAircraftList | aircraft | Array |
+| getHistoryListPaged | history | Array |
+| getFlightDataPaged | flightdata | Array |
+| getEventListPaged | events | Array |
+| getRelationships | relationships | Array |
+| getBulkAircraftExport | aircraft | Array |
+| getCondensedOwnerOperators | aircraftowneroperators | Array |
+| getPictures | pictures | Array |
+| getCompanyListPaged | companylist | Array |
+| getContactListPaged | contactlist | Array |
+| getModelMarketTrends | modelMarketTrends | Object |
+| getAcCompanyFractionalReportPaged | aircraftcompfractionalrefs | Array |
+
+## Enum Values
+
+airframetype: None, FixedWing, Rotary
+maketype: None, JetAirliner, BusinessJet, Turboprop, Piston, Turbine
+lifecycle: None, InProduction, NewWithManufacturer, InOperation, Retired, InStorage
+forsale (request): "true", "false", ""
+isnewaircraft / ispreownedtrans / isinternaltrans: Yes, No, Ignore
+transtype (request categories): None, FullSale, Lease, InternalSale, Management, Insurance, Repossession, Registration
+  NOTE: Response transtype values are different (descriptive strings like "Full Sale - Retail to Retail"). Do not use response values in request payloads.
+
+## ID System
+
+| ID | Type | Purpose | Stable? |
+|----|------|---------|---------|
+| aircraftid | int | Primary key for aircraft, join key for all sub-records | Yes |
+| regnbr | string | Tail number (human-readable) | No -- can change |
+| modelid / AMODID | int | Aircraft model, used in modlist arrays | Yes |
+| companyid | int | Company/entity ID | Yes |
+| contactid | int | Person ID | Yes |
+| transid | int | Transaction record ID (for dedup) | Yes |
+| serialnbr | string | Manufacturer serial number | Yes |
+| baseicao | string | Home airport (4-char ICAO code) | Changes |
+
+## Model IDs (modlist)
+
+872 unique model IDs across 67 makes and 5 make types.
+Full machine-readable table: references/model-id-table.json
+
+Common examples:
+- Gulfstream G550: modlist [278]
+- Gulfstream G650 + G650ER: modlist [663, 1211]
+- Citation Latitude: modlist [1167]
+- All Citation CJ3 variants: modlist [279, 1194]
+- Challenger 350: modlist [1188]
+- King Air 350: modlist [142]
+- Bell 407: modlist [100]
+- modlist: [] = no filter (all models)
+
+## Pagination Pattern
+
+URL: POST .../getHistoryListPaged/{apiToken}/{pagesize}/{page}
+Pages are 1-based. Use `maxpages` for loop control.
+
+```python
+results, page = [], 1
+while True:
+    data = api("POST", f"{path}/{pagesize}/{page}", bearer, token, body)
+    for key in ["history","flightdata","events","aircraft","aircraftowneroperators","companylist","contactlist","relationships","aircraftcompfractionalrefs"]:
+        if key in data and isinstance(data[key], list):
+            results.extend(data[key])
+            break
+    if page >= max(data.get("maxpages", 1), 1):
+        break
+    page += 1
+```
+
+## Schema Differences (Owner/Operator)
+
+| Endpoint | Schema | Relation Field |
+|----------|--------|---------------|
+| getRegNumber | Flat: companyname, contactfirstname | companyrelation |
+| getRelationships / getHistoryList | Nested: company.name, contact.firstname | relationtype |
+| getBulkAircraftExport | Prefixed: owrcompanyname, oprcompanyname | prefix (owr*, opr*, chp*) |
+| getAcCompanyFractionalReportPaged | Flat: companyname | relation |
+
+## Normalized Response Shapes
+
+AircraftCard: aircraftId, modelId, tailNumber, serialNumber, make, model, yearMfr, yearDelivered, makeType, airframeType, weightClass, categorySize, lifecycle, forSale, owner (CompanyCard), operator (CompanyCard)
+
+CompanyCard: companyId, name, city, state, country, phone, email, contact (ContactCard)
+
+ContactCard: contactId, firstName, lastName, title, email, phone
+
+GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, categorySize, weightClass, forSale, askingPrice, owner, operator, chiefPilot, baseIcao, baseAirport, baseCountry, dataSource="JETNET"
+
+## File Manifest
+
+| File | Purpose | Format |
+|------|---------|--------|
+| llms.txt | This file -- concise AI agent reference | Markdown |
+| llms-full.txt | Complete reference (all docs concatenated) | Markdown |
+| references/model-id-table.json | 872 model IDs with make/model/ICAO/fleet counts | JSON array |
+| references/model-id-table.csv | Same data for spreadsheets | CSV |
+| evals/evals.json | AI eval test cases | JSON |
+| src/jetnet/session.py | Python session helper (drop into agent) | Python |
+| src/jetnet/session.ts | TypeScript session helper | TypeScript |
+| docs/response-shapes.md | Normalized response contracts with factories | Markdown |
+| docs/common-mistakes.md | Every known gotcha | Markdown |
+| docs/enum-reference.md | Valid enum values | Markdown |
+| docs/authentication.md | Auth deep dive | Markdown |
+| docs/pagination.md | Pagination patterns | Markdown |
+| docs/response-handling.md | Schema differences by endpoint | Markdown |
+| docs/id-system.md | ID types and usage | Markdown |
+| references/endpoints.md | Full endpoint reference | Markdown |
+| examples/responses/ | 16 known-good JSON response examples | JSON |
+| prompts/ | 4 AI system prompts (Cursor/Copilot format) | Markdown |
+
+---
+
+## === Authentication (docs/authentication.md) ===
+
+# Authentication
+
+## Login Endpoint
+
+All JETNET API calls require authentication via the login endpoint:
+
+```http
+POST https://customer.jetnetconnect.com/api/Admin/APILogin
+Content-Type: application/json
+
+{
+  "emailAddress": "YOUR_EMAIL@example.com",
+  "password": "YOUR_PASSWORD"
+}
+```
+
+> **Important:** The field is `emailAddress` with a capital **A**. This is the single most common auth mistake. It is not `email`, `emailaddress`, or `email_address`.
+
+## Response Tokens
+
+A successful login returns two tokens:
+
+| Token | Purpose |
+|-------|---------|
+| `bearerToken` | Sent in the `Authorization` header on every request |
+| `apiToken` | Inserted into the URL path on every request (also called `securityToken` in some docs — same field) |
+
+## Using Tokens on Subsequent Calls
+
+Every API call after login requires both tokens:
+
+1. **Header:** `Authorization: Bearer {bearerToken}`
+2. **URL path:** Replace `{apiToken}` in the endpoint path with your actual `apiToken` value
+
+The `apiToken` goes **in the URL path only** — never in headers or the JSON body.
+
+### Example
+
+```
+GET /api/Aircraft/getRegNumber/N123AB/{apiToken}
+Authorization: Bearer {bearerToken}
+```
+
+## Two-Tier Model
+
+JETNET uses a two-tier model for API usage:
+
+| Tier | Use Case | Characteristics |
+|------|----------|----------------|
+| **Tier A — Interactive** | Tail lookup, owner/operator, pictures, quick flight summary, CRM enrichment | One aircraft at a time, low volume, user is waiting |
+| **Tier B — Bulk / Data Engineering** | Nightly sync, history exports, analytics pipelines, large event windows | Always paged, run async, never drive a live UI off these |
+
+If building an app or a script for a salesperson: **Tier A**.
+If a customer asks about bulk export, nightly refresh, or history across thousands of aircraft: **Tier B**.
+
+## Environment Variable Setup
+
+Store your credentials in environment variables — never hard-code them:
+
+```bash
+export JETNET_EMAIL="your_email@example.com"
+export JETNET_PASSWORD="your_password"
+```
+
+## Token Refresh Pattern
+
+Tokens expire after **60 minutes**. For long-running pipelines, proactively re-login before expiry rather than waiting for a failure.
+
+### Python
+
+```python
+import time, os, requests
+
+BASE = "https://customer.jetnetconnect.com"
+token_issued = 0
+TOKEN_TTL = 50 * 60  # refresh after 50 min (tokens last 60 min)
+
+def login(email, password):
+    r = requests.post(f"{BASE}/api/Admin/APILogin",
+                      json={"emailAddress": email, "password": password})
+    r.raise_for_status()
+    d = r.json()
+    return d["bearerToken"], d["apiToken"]
+
+def get_tokens():
+    global bearer, token, token_issued
+    if time.time() - token_issued > TOKEN_TTL:
+        bearer, token = login(os.environ["JETNET_EMAIL"], os.environ["JETNET_PASSWORD"])
+        token_issued = time.time()
+    return bearer, token
+```
+
+### JavaScript
+
+```javascript
+const BASE = "https://customer.jetnetconnect.com";
+let bearerToken, apiToken, tokenIssued = 0;
+const TOKEN_TTL = 50 * 60 * 1000; // 50 minutes in ms
+
+async function login(email, password) {
+  const res = await fetch(`${BASE}/api/Admin/APILogin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emailAddress: email, password })
+  });
+  if (!res.ok) throw new Error(`Login failed: ${res.status}`);
+  const data = await res.json();
+  return { bearerToken: data.bearerToken, apiToken: data.apiToken };
+}
+
+async function getTokens() {
+  if (Date.now() - tokenIssued > TOKEN_TTL) {
+    const tokens = await login(process.env.JETNET_EMAIL, process.env.JETNET_PASSWORD);
+    bearerToken = tokens.bearerToken;
+    apiToken = tokens.apiToken;
+    tokenIssued = Date.now();
+  }
+  return { bearerToken, apiToken };
+}
+```
+
+## Retry on INVALID SECURITY TOKEN
+
+When you receive `"ERROR: INVALID SECURITY TOKEN"` in the `responsestatus` field:
+
+1. Re-login to get fresh tokens
+2. Retry the failed request once with the new tokens
+3. **Never loop** — if it fails again, surface the error
+
+```python
+def api(method, path, bearer, token, body=None):
+    url = f"{BASE}{path}".replace("{apiToken}", token)
+    headers = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    r = requests.request(method, url, headers=headers, json=body)
+    r.raise_for_status()
+    result = r.json()
+    status = result.get("responsestatus", "").upper()
+    if "INVALID SECURITY TOKEN" in status:
+        bearer, token = login(os.environ["JETNET_EMAIL"], os.environ["JETNET_PASSWORD"])
+        r = requests.request(method, url.replace(token, token), headers=headers, json=body)
+        r.raise_for_status()
+        result = r.json()
+    if "ERROR" in result.get("responsestatus", "").upper():
+        raise ValueError(f"JETNET error: {result['responsestatus']}")
+    return result
+```
+
+## Recommended: Session Helpers
+
+For production apps, use the session helpers instead of managing tokens manually. They handle login, proactive refresh, `/getAccountInfo` validation, and auto-retry:
+
+**Python** — [`src/jetnet/session.py`](../src/jetnet/session.py)
+
+```python
+from src.jetnet.session import login, ensure_session, jetnet_request
+
+session = login("you@example.com", "password", "https://customer.jetnetconnect.com")
+session = ensure_session(session)
+result = jetnet_request("GET", "/api/Aircraft/getRegNumber/N1KE/{apiToken}", session)
+```
+
+**TypeScript** — [`src/jetnet/session.ts`](../src/jetnet/session.ts)
+
+```typescript
+import { login, ensureSession, jetnetRequest } from "../../src/jetnet/session";
+
+let session = await login(email, password, baseUrl);
+session = await ensureSession(session);
+const result = await jetnetRequest("GET", "/api/Aircraft/getRegNumber/N1KE/{apiToken}", session);
+```
+
+## Token Validation with /getAccountInfo
+
+`GET /api/Admin/getAccountInfo/{apiToken}` is a lightweight endpoint that returns your account details. Use it as a health check before long workflows:
+
+- Cheap call — no data payload, fast response
+- If it returns a valid response, your token is good
+- If it returns `INVALID SECURITY TOKEN`, re-login once and retry
+- The session helpers call this automatically via `ensure_session()`
+
+To measure the actual TTL for your tenant:
+
+```bash
+python scripts/token_probe.py
+```
+
+## Security Best Practices
+
+- Never expose tokens in client-side code (browser or mobile app)
+- Always proxy JETNET calls through your own backend
+- Store credentials in environment variables or a secrets manager
+- Do not log tokens in production
+
+---
+
+## === Common Mistakes (docs/common-mistakes.md) ===
+
+# Common Mistakes
+
+## Authentication
+
+### `emailAddress` has a capital A
+
+The login field is `emailAddress` — not `email`, `emailaddress`, or `email_address`. This is the single most common auth mistake.
+
+```json
+// Wrong
+{ "email": "user@example.com", "password": "..." }
+{ "emailaddress": "user@example.com", "password": "..." }
+
+// Correct
+{ "emailAddress": "user@example.com", "password": "..." }
+```
+
+### `apiToken` goes in the URL path only
+
+The `apiToken` is placed in the URL path — never in headers or the JSON body.
+
+```
+// Wrong
+Authorization: Bearer {bearerToken} {apiToken}
+{ "apiToken": "abc123", ... }
+
+// Correct
+GET /api/Aircraft/getRegNumber/N123AB/{apiToken}
+Authorization: Bearer {bearerToken}
+```
+
+## Response Handling
+
+### HTTP 200 does not mean success
+
+JETNET returns HTTP 200 for most responses, including errors. Always check `responsestatus`:
+
+```python
+result = r.json()
+if "ERROR" in result.get("responsestatus", "").upper():
+    raise ValueError(f"JETNET error: {result['responsestatus']}")
+```
+
+### `companyrelation` vs `relationtype`
+
+Different endpoints use different field names for the relationship type. Using the wrong field returns nothing:
+
+| Endpoint | Field Name |
+|----------|-----------|
+| `getRegNumber` | `companyrelation` |
+| `getHistoryList` / `getRelationships` | `relationtype` |
+| `getBulkAircraftExport` | Field prefix (`owr*`, `opr*`, `chp*`) |
+| `getAcCompanyFractionalReportPaged` | `relation` |
+
+See [Response Handling](response-handling.md) for the full schema comparison.
+
+## Filters and Payloads
+
+### Empty `aclist: []` means no filter, not empty results
+
+Sending `"aclist": []` does not return zero results — it removes the aircraft filter entirely, returning all matching records. Be intentional:
+
+```json
+// Returns ALL aircraft (no filter)
+{ "aclist": [], "modlist": [] }
+
+// Returns only these specific aircraft
+{ "aclist": [128228, 242781], "modlist": [] }
+```
+
+### `transtype: ["None"]` not `[]` for all history types
+
+To get all transaction types in history queries, send `["None"]` — not an empty array:
+
+```json
+// Wrong — may not return all types
+{ "transtype": [] }
+
+// Correct — returns all transaction types
+{ "transtype": ["None"] }
+```
+
+## Date Formatting
+
+### Use `MM/DD/YYYY` with leading zeros
+
+JETNET requires `MM/DD/YYYY` format with leading zeros:
+
+```json
+// Wrong
+{ "startdate": "1/1/2024" }
+
+// Correct
+{ "startdate": "01/01/2024" }
+```
+
+### `getBulkAircraftExport` accepts datetime strings
+
+The `actiondate` and `enddate` fields accept full datetime strings for hourly polling windows:
+
+```json
+{ "actiondate": "02/26/2026 10:00:00", "enddate": "02/26/2026 11:00:00" }
+```
+
+## String Booleans
+
+### `forsale` in responses is a string
+
+In most endpoints, `forsale` is `"true"` or `"false"` (strings), not JSON booleans:
+
+```python
+# Wrong
+if record["forsale"]:  # Always truthy because it's a non-empty string
+
+# Correct
+if record["forsale"] == "true":
+```
+
+### `getBulkAircraftExport` uses `"Y"` / `"N"` for forsale
+
+The bulk export endpoint uses a different convention:
+
+```python
+# In getBulkAircraftExport
+if record["forsale"] == "Y":
+```
+
+### `datepurchased` format differs in bulk export
+
+In `getBulkAircraftExport`, `datepurchased` is `YYYYMMDD` format (not `MM/DD/YYYY`).
+
+## Endpoint-Specific Issues
+
+### `getAircraftList` has no paged variant
+
+Unlike most list endpoints, `getAircraftList` does not have a paged version. Use filters (`modlist`, geographic params, `forsale`) to control result size.
+
+### `getEventList` enum values are strict
+
+Sending unrecognized enum values to `getEventList` produces an `ERROR` in `responsestatus` despite HTTP 200. Use `getEventTypes` and `getEventCategories` to get valid values first.
+
+### `getBulkAircraftExport` returns `maxpages: 0` for single-page results
+
+When all results fit in one call, the response has `maxpages: 0` and `currentpage: 0`. Use `max(maxpages, 1)` in your loop or you will exit immediately and miss all records:
+
+```python
+if page >= max(data.get("maxpages", 1), 1):
+    break
+```
+
+### `getAcCompanyFractionalReportPaged` response key
+
+The response key is `aircraftcompfractionalrefs`. Each row is one relationship per aircraft:
+
+- `fractionPercentOwned: "100.00"` = actual owner
+- `fractionPercentOwned: "0.00"` = operator/manager on same aircraft
+- The `relationship` filter is an array: `["Fractional Owner"]`
+
+## Field Name Gotchas
+
+### `getRegNumber` flat companyrelationships
+
+The flat schema uses `companyrelation` and prefixed fields (`companyname`, `contactfirstname`). For FBO ramp contact lookup, filter on `contacttitle` for Chief Pilot, Director of Aviation, Scheduler, or Dispatcher.
+
+### `getBulkAircraftExport` flat prefixed schema
+
+Role-prefixed fields: `owr*` = owner, `opr*` = operator, `chp*` = chief pilot, `excbrk1*`/`excbrk2*` = brokers, `addl1-3*` = additional. This is not the same schema as `getRegNumber` or `getRelationships`.
+
+---
+
+## === Response Handling & Schema Differences (docs/response-handling.md) ===
+
+# Response Handling
+
+## HTTP 200 Does Not Mean Success
+
+JETNET returns HTTP 200 for most responses, including errors. You must always check the `responsestatus` field in the JSON body:
+
+```python
+result = r.json()
+if "ERROR" in result.get("responsestatus", "").upper():
+    raise ValueError(f"JETNET error: {result['responsestatus']}")
+```
+
+```javascript
+const data = await res.json();
+if ((data.responsestatus || "").toUpperCase().includes("ERROR")) {
+  throw new Error(`JETNET error: ${data.responsestatus}`);
+}
+```
+
+## responsestatus Values
+
+| Status Pattern | Meaning |
+|---------------|---------|
+| `"SUCCESS"` | Request succeeded (non-paged) |
+| `"SUCCESS: PAGE [ 1 of 428 ]"` | Paged request succeeded |
+| `"ERROR: INVALID SECURITY TOKEN"` | Token expired — re-login and retry once |
+| `"ERROR: ..."` | Any other error — do not retry, surface the message |
+
+## companyrelationships Schema Differences
+
+The `companyrelationships` structure **differs by endpoint**. This is the single biggest source of bugs when working across multiple JETNET endpoints.
+
+| Endpoint | Schema | Relation Field | Relation Values |
+|----------|--------|---------------|----------------|
+| `getRegNumber` | **Flat** — prefixed fields (`companyname`, `contactfirstname`) | `companyrelation` | `"Owner"`, `"Operator"`, `"Chief Pilot"` |
+| `getAircraftList` | Not present | — | — |
+| `getHistoryList` / `getRelationships` | **Nested** — `company: {}`, `contact: {}` sub-objects | `relationtype` | `"Owner"`, `"Operator"`, `"Seller"`, `"Purchaser"`, `"Seller's Broker"` |
+| `getBulkAircraftExport` | **Flat prefixed by role** — `owr*`, `opr*`, `chp*`, `excbrk1*`, `addl1*` | Field prefix | Owner=`owr*`, Operator=`opr*`, Chief Pilot=`chp*` |
+| `getAcCompanyFractionalReportPaged` | **Flat** — top-level `comp*` and `contact*` fields | `relation` | `"Owner"`, `"Flight Department"`, `"Certificate Holder"` |
+
+### getRegNumber (Flat Schema)
+
+Fields are prefixed at the top level of each relationship object:
+
+```json
+{
+  "companyrelation": "Owner",
+  "companyname": "Acme Aviation LLC",
+  "companyid": 4425,
+  "contactfirstname": "John",
+  "contactlastname": "Doe",
+  "contacttitle": "Director of Aviation"
+}
+```
+
+### getHistoryList / getRelationships (Nested Schema)
+
+Each relationship contains nested `company` and `contact` objects:
+
+```json
+{
+  "relationtype": "Owner",
+  "relationseqno": 1,
+  "company": {
+    "companyid": 4425,
+    "name": "Acme Aviation LLC",
+    "address": "123 Main St"
+  },
+  "contact": {
+    "contactid": 747133,
+    "firstname": "John",
+    "lastname": "Doe"
+  }
+}
+```
+
+### getBulkAircraftExport (Flat Prefixed by Role)
+
+Each role uses a different field prefix:
+
+```json
+{
+  "owrcompanyname": "Acme Aviation LLC",
+  "owrcompanyid": 4425,
+  "oprcompanyname": "Flight Ops Inc",
+  "oprcompanyid": 5678,
+  "chpfirstname": "Mike",
+  "chplastname": "Smith"
+}
+```
+
+| Prefix | Role |
+|--------|------|
+| `owr*` | Owner |
+| `opr*` | Operator |
+| `chp*` | Chief Pilot |
+| `excbrk1*` / `excbrk2*` | Exclusive Brokers |
+| `addl1*` / `addl2*` / `addl3*` | Additional relationships |
+
+### getAcCompanyFractionalReportPaged (Flat)
+
+```json
+{
+  "relation": "Fractional Owner",
+  "companyname": "NetJets Sales Inc",
+  "companyid": 12345,
+  "fractionPercentOwned": "100.00"
+}
+```
+
+- `fractionPercentOwned: "100.00"` = actual owner
+- `fractionPercentOwned: "0.00"` = operator/manager on same aircraft
+
+## Key Response Keys by Endpoint
+
+| Endpoint | Response Key | Type |
+|----------|-------------|------|
+| `getRegNumber` | `aircraftresult` | Object |
+| `getAircraftList` | `aircraft` | Array |
+| `getHistoryListPaged` | `history` | Array |
+| `getFlightDataPaged` | `flightdata` | Array |
+| `getEventListPaged` | `events` | Array |
+| `getRelationships` | `relationships` | Array |
+| `getBulkAircraftExport` | `aircraft` | Array |
+| `getCondensedOwnerOperators` | `aircraftowneroperators` | Array |
+| `getPictures` | `pictures` | Array |
+
+---
+
+## === Response Shapes (Normalized Contracts) (docs/response-shapes.md) ===
+
+# JETNET Response Shapes -- Normalized Contracts
+
+This document defines three canonical data shapes that normalize JETNET's five raw
+response schemas into a consistent interface for UI and pipeline code.
+
+Use these shapes as your application's internal data model. Transform raw JETNET
+responses into these shapes at the API boundary -- never spread raw field names
+(`owrfname`, `companyrelation`, `contactfirstname`) through your UI components.
+
+---
+
+## Why Normalize?
+
+JETNET returns company/contact data in five different schemas depending on the
+endpoint. See the Schema Mapping Quick Reference below for the comparison table.
+Normalizing at ingestion means your UI components, CRM mappers, and export jobs
+only deal with one shape.
+
+---
+
+## 1. AircraftCard
+
+Canonical aircraft summary. Produced by tail-lookup, aircraft list, and bulk export.
+
+```typescript
+interface AircraftCard {
+  // Identity
+  aircraftId: number
+  modelId: number
+  tailNumber: string       // regnbr
+  serialNumber: string     // sernbr / serialnbr
+  make: string             // e.g. "GULFSTREAM"
+  model: string            // e.g. "G550"
+  yearMfr: number
+  yearDelivered: number
+
+  // Classification
+  makeType: string         // "BusinessJet" | "Turboprop" | "Piston" | ...
+  airframeType: string     // "FixedWing" | "Rotorcraft"
+  weightClass: string      // "Light" | "Midsize" | "Heavy" | ...
+  categorySize: string     // "Light Jet" | "Large Long-Range Jet" | ...
+
+  // Status
+  lifecycle: string        // "InOperation" | "Written Off" | ...
+  usage: string            // "Business" | "Charter" | ...
+  ownership: string        // "Wholly Owned" | "Fractional" | ...
+  forSale: boolean
+  askingPrice: string | null  // "Inquire" or dollar string or null
+  marketStatus: string | null
+
+  // Home base
+  baseIcao: string | null
+  baseAirport: string | null
+  baseCountry: string | null
+  baseContinent: string | null
+
+  // Airframe metrics
+  estimatedAFTT: number | null
+  estimatedCycles: number | null
+  estimatedFlightHours: number | null
+
+  // Relationships (normalized -- see CompanyCard below)
+  owner: CompanyCard | null
+  operator: CompanyCard | null
+  chiefPilot: ContactCard | null
+  exclusiveBrokers: CompanyCard[]
+  additionalRelations: RelationCard[]
+}
+```
+
+### Python factory (from getRegNumber / tail lookup)
+
+```python
+def aircraft_card_from_regnbr(raw: dict) -> dict:
+    ac = raw.get("aircraftresult", raw)
+    rels = ac.get("companyrelationships", [])
+    owner = next((r for r in rels if r["companyrelation"] == "Owner"), None)
+    operator = next((r for r in rels if r["companyrelation"] == "Operator"), None)
+    return {
+        "aircraftId": ac.get("aircraftid"),
+        "modelId": ac.get("modelid"),
+        "tailNumber": ac.get("regnbr"),
+        "serialNumber": ac.get("serialnbr") or ac.get("sernbr"),
+        "make": ac.get("make"),
+        "model": ac.get("model"),
+        "yearMfr": ac.get("yearmfr"),
+        "yearDelivered": ac.get("yeardlv"),
+        "makeType": ac.get("maketype"),
+        "airframeType": ac.get("airframetype"),
+        "weightClass": ac.get("weightclass"),
+        "categorySize": ac.get("categorysize"),
+        "lifecycle": ac.get("lifecycle"),
+        "usage": ac.get("usage"),
+        "ownership": ac.get("ownership"),
+        "forSale": bool(ac.get("forsale")),
+        "askingPrice": None,
+        "marketStatus": None,
+        "baseIcao": ac.get("baseicao"),
+        "baseAirport": ac.get("baseairport"),
+        "baseCountry": ac.get("basecountry"),
+        "baseContinent": ac.get("basecontinent"),
+        "estimatedAFTT": ac.get("estaftt"),
+        "estimatedCycles": ac.get("estcycles"),
+        "estimatedFlightHours": None,
+        "owner": company_card_from_flat(owner) if owner else None,
+        "operator": company_card_from_flat(operator) if operator else None,
+        "chiefPilot": None,
+        "exclusiveBrokers": [],
+        "additionalRelations": [],
+    }
+```
+
+### Python factory (from getBulkAircraftExportPaged -- flat owr*/opr*/chp* schema)
+
+```python
+def aircraft_card_from_bulk(raw: dict) -> dict:
+    for_sale_raw = raw.get("forsale", "N")
+    for_sale = for_sale_raw == "Y" if isinstance(for_sale_raw, str) else bool(for_sale_raw)
+
+    owner = None
+    if raw.get("owrcompid"):
+        owner = {
+            "companyId": raw["owrcompid"],
+            "name": raw.get("owrcompanyname"),
+            "city": raw.get("owrcity"),
+            "state": raw.get("owrstate"),
+            "country": raw.get("owrcountry"),
+            "phone": raw.get("owrphone1"),
+            "email": raw.get("owremail"),
+            "contact": {
+                "contactId": raw.get("owrcontactid"),
+                "firstName": raw.get("owrfname"),
+                "lastName": raw.get("owrlname"),
+                "title": raw.get("owrtitle"),
+                "email": raw.get("owremail"),
+                "phone": raw.get("owrphone1"),
+            },
+        }
+    return {
+        "aircraftId": raw.get("aircraftid"),
+        "modelId": raw.get("modelid"),
+        "tailNumber": raw.get("regnbr"),
+        "serialNumber": raw.get("sernbr"),
+        "make": raw.get("make"),
+        "model": raw.get("model"),
+        "yearMfr": raw.get("yearmfr"),
+        "yearDelivered": raw.get("yeardelivered"),
+        "makeType": raw.get("maketype"),
+        "airframeType": raw.get("airframetype"),
+        "lifecycle": raw.get("lifecycle"),
+        "forSale": for_sale,
+        "askingPrice": raw.get("asking"),
+        "marketStatus": raw.get("status"),
+        "estimatedAFTT": raw.get("estaftt"),
+        "estimatedCycles": raw.get("estcycles"),
+        "estimatedFlightHours": raw.get("estflighthrs"),
+        "owner": owner,
+        "operator": None,   # map opr* similarly if needed
+        "chiefPilot": None, # map chp* if needed
+        "exclusiveBrokers": [],
+        "additionalRelations": [],
+    }
+```
+
+---
+
+## 2. CompanyCard
+
+Canonical company + primary contact. Used as a nested shape inside AircraftCard
+and as a standalone for CRM upsert operations.
+
+```typescript
+interface ContactCard {
+  contactId: number | null
+  firstName: string | null
+  lastName: string | null
+  fullName: string          // computed: firstName + ' ' + lastName
+  title: string | null
+  email: string | null
+  phone: string | null      // best available phone
+  officePhone: string | null
+  mobilePhone: string | null
+}
+
+interface CompanyCard {
+  companyId: number
+  name: string
+  address1: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  postCode: string | null
+  email: string | null
+  phone: string | null      // office phone
+  businessType: string | null
+  agencyType: string | null
+  contact: ContactCard | null
+}
+```
+
+### Python factory (from getRegNumber flat companyrelationships)
+
+```python
+def company_card_from_flat(rel: dict) -> dict:
+    """
+    Normalize a flat getRegNumber companyrelationships entry.
+    Field prefix: company* for company, contact* for contact.
+    """
+    first = rel.get("contactfirstname") or ""
+    last  = rel.get("contactlastname") or ""
+    return {
+        "companyId":   rel.get("companyid"),
+        "name":        rel.get("companyname"),
+        "address1":    rel.get("companyaddress1"),
+        "city":        rel.get("companycity"),
+        "state":       rel.get("companystate") or rel.get("companystateabbr"),
+        "country":     rel.get("companycountry"),
+        "postCode":    rel.get("companypostcode"),
+        "email":       rel.get("companyemail"),
+        "phone":       rel.get("companyofficephone"),
+        "businessType": rel.get("companybusinesstype"),
+        "agencyType":  rel.get("companyagencytype"),
+        "contact": {
+            "contactId":   rel.get("contactid"),
+            "firstName":   first,
+            "lastName":    last,
+            "fullName":    f"{first} {last}".strip(),
+            "title":       rel.get("contacttitle"),
+            "email":       rel.get("contactemail"),
+            "phone":       rel.get("contactbestphone"),
+            "officePhone": rel.get("contactofficephone"),
+            "mobilePhone": rel.get("contactmobilephone"),
+        },
+    }
+```
+
+### Python factory (from getRelationships / getHistoryList nested schema)
+
+```python
+def company_card_from_nested(rel: dict) -> dict:
+    """
+    Normalize a nested getRelationships / getHistoryList companyrelationships entry.
+    Has sub-objects: rel['company'] and rel['contact'].
+    """
+    co = rel.get("company") or {}
+    ct = rel.get("contact") or {}
+    first = ct.get("firstname") or ""
+    last  = ct.get("lastname") or ""
+    return {
+        "companyId":    co.get("companyid") or rel.get("companyid"),
+        "name":         co.get("name") or rel.get("name"),
+        "address1":     co.get("address1"),
+        "city":         co.get("city"),
+        "state":        co.get("state"),
+        "country":      co.get("country"),
+        "postCode":     co.get("postcode"),
+        "email":        co.get("email"),
+        "phone":        co.get("office"),
+        "businessType": rel.get("businesstype"),
+        "agencyType":   None,
+        "contact": {
+            "contactId":   ct.get("contactid") or rel.get("contactid"),
+            "firstName":   first,
+            "lastName":    last,
+            "fullName":    f"{first} {last}".strip(),
+            "title":       ct.get("title"),
+            "email":       ct.get("email"),
+            "phone":       ct.get("office") or ct.get("mobile"),
+            "officePhone": ct.get("office"),
+            "mobilePhone": ct.get("mobile"),
+        },
+    }
+```
+
+---
+
+## 3. GoldenPathResult
+
+The "golden path" shape: everything a front-end component or CRM trigger needs in
+one flat dict. Produced by combining AircraftCard + ownership history + market data.
+Designed for the Next.js tail-lookup template and CRM enrichment pipelines.
+
+```typescript
+interface GoldenPathResult {
+  // Aircraft identity (from AircraftCard)
+  aircraftId: number
+  tailNumber: string
+  make: string
+  model: string
+  yearMfr: number
+  yearDelivered: number
+  categorySize: string
+  weightClass: string
+
+  // Market status
+  forSale: boolean
+  askingPrice: string | null
+  marketStatus: string | null
+
+  // Current owner + operator (from AircraftCard)
+  owner: CompanyCard | null
+  operator: CompanyCard | null
+  chiefPilot: ContactCard | null
+
+  // Home base
+  baseIcao: string | null
+  baseAirport: string | null
+  baseCountry: string | null
+
+  // Enrichment metadata
+  jetnetPageUrl: string | null    // link to JETNET Evolution detail page
+  lastUpdated: string | null      // ISO datetime of last JETNET update
+  dataSource: string              // always "JETNET"
+}
+```
+
+### Python factory
+
+```python
+def golden_path_result(
+    aircraft_card: dict,
+    jetnet_page_url: str | None = None,
+    last_updated: str | None = None,
+) -> dict:
+    """
+    Produce a GoldenPathResult from a normalized AircraftCard.
+    """
+    return {
+        "aircraftId":    aircraft_card["aircraftId"],
+        "tailNumber":    aircraft_card["tailNumber"],
+        "make":          aircraft_card["make"],
+        "model":         aircraft_card["model"],
+        "yearMfr":       aircraft_card["yearMfr"],
+        "yearDelivered": aircraft_card["yearDelivered"],
+        "categorySize":  aircraft_card.get("categorySize"),
+        "weightClass":   aircraft_card.get("weightClass"),
+        "forSale":       aircraft_card.get("forSale", False),
+        "askingPrice":   aircraft_card.get("askingPrice"),
+        "marketStatus":  aircraft_card.get("marketStatus"),
+        "owner":         aircraft_card.get("owner"),
+        "operator":      aircraft_card.get("operator"),
+        "chiefPilot":    aircraft_card.get("chiefPilot"),
+        "baseIcao":      aircraft_card.get("baseIcao"),
+        "baseAirport":   aircraft_card.get("baseAirport"),
+        "baseCountry":   aircraft_card.get("baseCountry"),
+        "jetnetPageUrl": jetnet_page_url,
+        "lastUpdated":   last_updated,
+        "dataSource":    "JETNET",
+    }
+```
+
+---
+
+## Schema Mapping Quick Reference
+
+| Field in GoldenPathResult | getRegNumber (flat) | getBulkExport (prefixed) | getRelationships (nested) |
+|---|---|---|---|
+| owner.companyId | `companyid` | `owrcompid` | `company.companyid` |
+| owner.name | `companyname` | `owrcompanyname` | `company.name` |
+| owner.contact.firstName | `contactfirstname` | `owrfname` | `contact.firstname` |
+| owner.contact.lastName | `contactlastname` | `owrlname` | `contact.lastname` |
+| owner.contact.title | `contacttitle` | `owrtitle` | `contact.title` |
+| owner.contact.email | `contactemail` | `owremail` | `contact.email` |
+| owner.contact.phone | `contactbestphone` | `owrphone1` | `contact.office` |
+| relation field | `companyrelation` | prefix (`owr*`) | `relationtype` |
+
+---
+
+## TypeScript Utility (Next.js)
+
+```typescript
+// lib/normalize.ts
+
+export function companyCardFromFlat(rel: Record<string, unknown>): CompanyCard {
+  const first = String(rel['contactfirstname'] ?? '')
+  const last = String(rel['contactlastname'] ?? '')
+  return {
+    companyId: Number(rel['companyid']),
+    name: String(rel['companyname'] ?? ''),
+    address1: (rel['companyaddress1'] as string) ?? null,
+    city: (rel['companycity'] as string) ?? null,
+    state: (rel['companystateabbr'] as string) ?? null,
+    country: (rel['companycountry'] as string) ?? null,
+    postCode: (rel['companypostcode'] as string) ?? null,
+    email: (rel['companyemail'] as string) || null,
+    phone: (rel['companyofficephone'] as string) ?? null,
+    businessType: (rel['companybusinesstype'] as string) ?? null,
+    agencyType: (rel['companyagencytype'] as string) ?? null,
+    contact: {
+      contactId: rel['contactid'] ? Number(rel['contactid']) : null,
+      firstName: first || null,
+      lastName: last || null,
+      fullName: [first, last].filter(Boolean).join(' '),
+      title: (rel['contacttitle'] as string) ?? null,
+      email: (rel['contactemail'] as string) ?? null,
+      phone: (rel['contactbestphone'] as string) ?? null,
+      officePhone: (rel['contactofficephone'] as string) ?? null,
+      mobilePhone: (rel['contactmobilephone'] as string) ?? null,
+    },
+  }
+}
+
+export function aircraftCardFromRegNbr(raw: Record<string, unknown>): AircraftCard {
+  const ac = (raw['aircraftresult'] as Record<string, unknown>) ?? raw
+  const rels = (ac['companyrelationships'] as Record<string, unknown>[]) ?? []
+  const ownerRel = rels.find(r => r['companyrelation'] === 'Owner') ?? null
+  const opRel = rels.find(r => r['companyrelation'] === 'Operator') ?? null
+  return {
+    aircraftId: Number(ac['aircraftid']),
+    modelId: Number(ac['modelid']),
+    tailNumber: String(ac['regnbr'] ?? ''),
+    serialNumber: String(ac['serialnbr'] ?? ac['sernbr'] ?? ''),
+    make: String(ac['make'] ?? ''),
+    model: String(ac['model'] ?? ''),
+    yearMfr: Number(ac['yearmfr']),
+    yearDelivered: Number(ac['yeardlv'] ?? ac['yeardelivered']),
+    makeType: String(ac['maketype'] ?? ''),
+    airframeType: String(ac['airframetype'] ?? ''),
+    weightClass: String(ac['weightclass'] ?? ''),
+    categorySize: String(ac['categorysize'] ?? ''),
+    lifecycle: String(ac['lifecycle'] ?? ''),
+    usage: String(ac['usage'] ?? ''),
+    ownership: String(ac['ownership'] ?? ''),
+    forSale: Boolean(ac['forsale']),
+    askingPrice: null,
+    marketStatus: null,
+    baseIcao: (ac['baseicao'] as string) ?? null,
+    baseAirport: (ac['baseairport'] as string) ?? null,
+    baseCountry: (ac['basecountry'] as string) ?? null,
+    baseContinent: (ac['basecontinent'] as string) ?? null,
+    estimatedAFTT: ac['estaftt'] != null ? Number(ac['estaftt']) : null,
+    estimatedCycles: ac['estcycles'] != null ? Number(ac['estcycles']) : null,
+    estimatedFlightHours: null,
+    owner: ownerRel ? companyCardFromFlat(ownerRel) : null,
+    operator: opRel ? companyCardFromFlat(opRel) : null,
+    chiefPilot: null,
+    exclusiveBrokers: [],
+    additionalRelations: [],
+  }
+}
+```
+
+---
+
+## === ID System (docs/id-system.md) ===
+
+# JETNET ID System
+
+## The Core Principle
+
+JETNET uses several distinct ID systems. None of them are the same thing. The most common mistake is confusing `regnbr` (the tail number humans use) with `aircraftid` (the integer the API uses). Once you have `aircraftid`, almost everything else follows from it.
+
+## Quick Reference
+
+| Goal | ID to Use |
+|------|-----------|
+| Look up an aircraft by tail number | `regnbr` (input to `getRegNumber`) |
+| Call any aircraft sub-record endpoint | `aircraftid` |
+| Filter a list by aircraft type | `modelid` (in `modlist`) |
+| Filter a list to specific aircraft | `aircraftid` (in `aclist`) |
+| Pull a company's full record or contacts | `companyid` |
+| Cross-reference with manufacturer records | `serialnbr` |
+| Deduplicate history sync records | `transid` |
+| Geographic analysis and territory maps | `baseicao` |
+| Store as permanent external key in your database | `aircraftid` (not `regnbr`) |
+
+## Aircraft Identifiers
+
+### `aircraftid` (integer)
+
+JETNET's internal primary key for an aircraft. Every aircraft in the database has a unique `aircraftid` that never changes even if the registration number changes.
+
+**Where you get it:** From `getRegNumber`, `getAircraftList`, `getBulkAircraftExport`, or any history/event record.
+
+**When to use it:** As the join key for all sub-record calls — pictures, relationships, flight data, history. This is the ID to store if you are building a database or CRM integration.
+
+**Example:** `144322`
+
+### `regnbr` (string)
+
+The registration number (tail number) — the human-readable identifier printed on the aircraft. In the US this is typically `N` followed by numbers and letters (e.g., `N131SF`). International registrations follow country-specific formats.
+
+**Where you get it:** User input, or any aircraft record.
+
+**When to use it:** As input to `getRegNumber` for a tail lookup. Do not use `regnbr` as a database primary key — it can change when an aircraft is re-registered. `aircraftid` is stable; `regnbr` is not.
+
+**Example:** `"N131SF"`, `"G-XBEK"`, `"VH-NSX"`
+
+### `serialnbr` (string)
+
+The manufacturer's serial number (MSN). This is the number stamped on the airframe at the factory and never changes.
+
+**Where you get it:** Any aircraft record — `getRegNumber`, `getAircraft`, `getAircraftList`.
+
+**When to use it:** Cross-referencing with manufacturer records, logbooks, or export certificates. If you need a permanent external identifier that predates JETNET, this is it.
+
+**Example:** `"UC-131"`, `"2192"`, `"20564"`
+
+### `modelid` (integer)
+
+JETNET's internal ID for a specific aircraft model (make + model combination). The Gulfstream G550 has one `modelid`; the Gulfstream G600 has a different one.
+
+**Where you get it:** From any aircraft record, or from `getAircraftModelList` which returns a full list of models with their IDs for a given make.
+
+**When to use it:** As input to `modlist` in any list, history, or flight endpoint when you want to filter by aircraft type.
+
+**Example:** `145` (G550), `634` (G600), `1188` (Challenger 350)
+
+### `icaotype` (string)
+
+The four-character ICAO aircraft type designator. Used in flight planning systems and ATC.
+
+**Where you get it:** Aircraft records — `getRegNumber`, `getAircraft`.
+
+**When to use it:** Cross-referencing with flight tracking systems, ADS-B data, or ICAO databases. Not used as a JETNET filter parameter.
+
+**Example:** `"GLF5"` (Gulfstream V/G550), `"A319"` (Airbus A319/ACJ319)
+
+## Company Identifiers
+
+### `companyid` (integer)
+
+JETNET's internal primary key for a company (legal entity). Owners, operators, manufacturers, and fractional providers all have `companyid` values.
+
+**Where you get it:** From any relationship record — `getRelationships`, `getHistoryList`, `getRegNumber` companyrelationships, `getCompanyList`.
+
+**When to use it:** As input to company sub-record endpoints: `getCompany/{companyid}`, `getContacts/{companyid}`, `getRelatedcompanies/{companyid}`, `getAircraftrelationships/{companyid}`.
+
+**Example:** `4425`, `350427`
+
+### `parentcompanyid` (integer)
+
+The `companyid` of the parent company if the company is a subsidiary. Zero (`0`) means no parent — the company is a standalone entity.
+
+**Where you get it:** Company records and nested `company` objects in relationship arrays.
+
+**When to use it:** Building corporate hierarchy trees, identifying subsidiaries for fleet analysis, or understanding if an "operator" is actually a wholly owned subsidiary of the named owner.
+
+## Contact Identifiers
+
+### `contactid` (integer)
+
+JETNET's internal primary key for an individual person.
+
+**Where you get it:** From relationship records in `getRelationships`, `getHistoryList`, and `getRegNumber` companyrelationships.
+
+**When to use it:** As input to `getContact/{contactid}/{apiToken}` to pull the full contact record. Also used to de-duplicate contacts across multiple aircraft or company records.
+
+**Example:** `747133`, `524808`
+
+## Airport and Geography Identifiers
+
+### `baseicao` / `icao` (string)
+
+The four-character ICAO airport code for the aircraft's home base. More precise than IATA codes and the preferred identifier for aviation data systems.
+
+**Where you get it:** Aircraft records (`baseicao`), flight records (`origin`, `destination`).
+
+**When to use it:** For geographic analysis, territory mapping, and filtering. Use `getAirportList` to get a full airport list with ICAO codes and coordinates.
+
+**Example:** `"KOMA"` (Omaha Eppley), `"KTEB"` (Teterboro), `"LLBG"` (Tel Aviv Ben Gurion)
+
+### `baseiata` / `iata` (string)
+
+The three-character IATA airport code. More familiar to non-aviation audiences but less precise than ICAO (some airports have ICAO but no IATA).
+
+**Where you get it:** Aircraft records and flight records.
+
+**When to use it:** When displaying to end users who expect airline-style codes. Prefer ICAO for data joins.
+
+**Example:** `"OMA"`, `"TEB"`, `"TLV"`
+
+## Transaction and Event Identifiers
+
+### `transid` (integer)
+
+The unique ID for a specific history transaction record. Every ownership change, sale, or update event has a `transid`.
+
+**Where you get it:** From `getHistoryList` records.
+
+**When to use it:** For deduplication when building incremental sync pipelines. The JETNET transaction detail URL also uses `transid`:
+
+```
+http://www.jetnetevolution.com/DisplayAircraftDetail.aspx?acid={aircraftid}&jid={transid}
+```
+
+---
+
+## === Pagination (docs/pagination.md) ===
+
+# Pagination
+
+## When to Use Paged Endpoints
+
+Use `Paged` endpoint variants for history, flight data, events, bulk export, company lists, and contact lists. Non-paged versions time out on large datasets.
+
+| Endpoint | Paged Variant |
+|----------|--------------|
+| `getHistoryList` | `getHistoryListPaged` |
+| `getFlightData` | `getFlightDataPaged` |
+| `getEventList` | `getEventListPaged` |
+| `getBulkAircraftExport` | Always paged |
+| `getCompanyList` | `getCompanyListPaged` |
+| `getContactList` | `getContactListPaged` |
+| `getCondensedOwnerOperators` | `getCondensedOwnerOperatorsPaged` |
+
+## URL Pattern
+
+```
+POST .../getHistoryListPaged/{apiToken}/{pagesize}/{page}
+```
+
+- `{pagesize}` — number of records per page (typically `100`)
+- `{page}` — **1-based** (first page = `1`, not `0`)
+
+## Response Fields
+
+| Field | Meaning |
+|-------|---------|
+| `maxpages` | Total number of pages available |
+| `count` | Records on **this page** (not total records) |
+| `currentpage` | The page you requested |
+| `responsestatus` | Status string like `"SUCCESS: PAGE [ 1 of 428 ]"` |
+
+Use `maxpages` for loop control — do not parse the `responsestatus` string.
+
+## LIST_KEYS
+
+Paged responses contain the data array under one of these keys:
+
+```
+history, flightdata, events, aircraft, aircraftowneroperators,
+companylist, contactlist, relationships, aircraftcompfractionalrefs
+```
+
+## Pagination Loop — Python
+
+```python
+LIST_KEYS = {
+    "history", "flightdata", "events", "aircraft",
+    "aircraftowneroperators", "companylist", "contactlist",
+    "relationships", "aircraftcompfractionalrefs"
+}
+
+def get_all_pages(bearer, token, paged_path, body, pagesize=100):
+    results, page = [], 1
+    while True:
+        data = api("POST", f"{paged_path}/{pagesize}/{page}", bearer, token, body)
+        for key in LIST_KEYS:
+            if key in data and isinstance(data[key], list):
+                results.extend(data[key])
+                break
+        if page >= data.get("maxpages", 1):
+            break
+        page += 1
+    return results
+```
+
+## Pagination Loop — JavaScript
+
+```javascript
+const LIST_KEYS = new Set([
+  "history", "flightdata", "events", "aircraft",
+  "aircraftowneroperators", "companylist", "contactlist",
+  "relationships", "aircraftcompfractionalrefs"
+]);
+
+async function getAllPages(bearerToken, apiToken, pagedPath, body, pagesize = 100) {
+  const results = [];
+  let page = 1;
+  while (true) {
+    const data = await api("POST", `${pagedPath}/${pagesize}/${page}`, bearerToken, apiToken, body);
+    for (const key of LIST_KEYS) {
+      if (Array.isArray(data[key])) {
+        results.push(...data[key]);
+        break;
+      }
+    }
+    if (page >= (data.maxpages || 1)) break;
+    page++;
+  }
+  return results;
+}
+```
+
+## getBulkAircraftExport — maxpages:0 Quirk
+
+`getBulkAircraftExport` returns `maxpages: 0` and `currentpage: 0` when **all results fit in a single response**. If your loop checks `page >= maxpages` before processing, you will exit immediately and miss all records.
+
+**Fix:** Use `Math.max(maxpages, 1)` (or `max(maxpages, 1)` in Python) in your loop condition:
+
+```python
+def get_bulk_export(bearer, token, body, pagesize=100):
+    results, page = [], 1
+    while True:
+        data = api("POST",
+                   f"/api/Aircraft/getBulkAircraftExport/{token}/{pagesize}/{page}",
+                   bearer, token, body)
+        results.extend(data.get("aircraft", []))
+        if page >= max(data.get("maxpages", 1), 1):
+            break
+        page += 1
+    return results
+```
+
+```javascript
+async function getBulkExport(bearerToken, apiToken, body, pagesize = 100) {
+  const results = [];
+  let page = 1;
+  while (true) {
+    const data = await api("POST",
+      `/api/Aircraft/getBulkAircraftExport/${apiToken}/${pagesize}/${page}`,
+      bearerToken, apiToken, body);
+    results.push(...(data.aircraft || []));
+    if (page >= Math.max(data.maxpages || 1, 1)) break;
+    page++;
+  }
+  return results;
+}
+```
+
+---
+
+## === Enum Reference (docs/enum-reference.md) ===
+
+# Enum Reference
+
+## airframetype
+
+Filters by aircraft airframe category.
+
+| Value | Description |
+|-------|-------------|
+| `None` | No filter (all airframe types) |
+| `FixedWing` | Fixed-wing aircraft |
+| `Rotary` | Rotorcraft (helicopters) |
+
+## maketype
+
+Filters by aircraft propulsion/category.
+
+| Value | Description |
+|-------|-------------|
+| `None` | No filter (all make types) |
+| `JetAirliner` | Commercial jet airliners |
+| `BusinessJet` | Business jets |
+| `Turboprop` | Turboprop aircraft |
+| `Piston` | Piston-engine aircraft |
+| `Turbine` | Turbine-powered (helicopters) |
+
+## lifecycle
+
+Filters by aircraft operational status.
+
+| Value | Description |
+|-------|-------------|
+| `None` | No filter (all lifecycle stages) |
+| `InProduction` | Currently being manufactured |
+| `NewWithManufacturer` | Completed but not yet delivered |
+| `InOperation` | Active and in service |
+| `Retired` | Permanently out of service |
+| `InStorage` | Temporarily inactive / stored |
+
+## forsale (Request)
+
+Filters by for-sale status in request payloads. These are **string values**, not booleans.
+
+| Value | Description |
+|-------|-------------|
+| `"true"` | Only aircraft listed for sale |
+| `"false"` | Only aircraft not listed for sale |
+| `""` | No filter (all aircraft) |
+
+> **Note:** In `getBulkAircraftExport` responses, `forsale` uses `"Y"` / `"N"` instead.
+
+## isnewaircraft / ispreownedtrans / isinternaltrans
+
+Three-state filters used in history and transaction queries.
+
+| Value | Description |
+|-------|-------------|
+| `"Yes"` | Include only matching records |
+| `"No"` | Exclude matching records |
+| `"Ignore"` | No filter on this field |
+
+## transtype (Request)
+
+Transaction type categories used in history list request payloads. These are **category labels**, not the full descriptive strings returned in responses.
+
+| Value | Description |
+|-------|-------------|
+| `"None"` | All transaction types (no filter) |
+| `"FullSale"` | Full sale transactions |
+| `"Lease"` | Lease transactions |
+| `"InternalSale"` | Internal/corporate transfers |
+| `"Management"` | Management changes |
+| `"Insurance"` | Insurance-related transactions |
+| `"Repossession"` | Repossession events |
+| `"Registration"` | Registration changes |
+
+> **Important:** Use `["None"]` (not `[]`) to retrieve all transaction types.
+
+## transtype (Response)
+
+In **response** records, `transtype` is a full descriptive string. These are different from the request category values.
+
+Examples of response values:
+- `"Full Sale - Retail to Retail"`
+- `"Full Sale - Retail to Wholesale"`
+- `"Lease - Operating Lease"`
+- `"Internal Sale - Corporate Restructure"`
+
+Do not use response `transtype` values in request payloads — they will not match.
+
+## Make Names
+
+Make names in the API are **all-caps strings**:
+
+| Value | Manufacturer |
+|-------|-------------|
+| `"GULFSTREAM"` | Gulfstream Aerospace |
+| `"BOMBARDIER"` | Bombardier Aviation |
+| `"DASSAULT"` | Dassault Aviation |
+| `"CESSNA"` | Cessna / Textron Aviation |
+| `"EMBRAER"` | Embraer |
+| `"BEECHCRAFT"` | Beechcraft / Textron Aviation |
+| `"PILATUS"` | Pilatus Aircraft |
+| `"AIRBUS"` | Airbus |
+| `"BOEING"` | Boeing |
+
+Use `getAircraftMakeList` to get the complete list of valid make names.
+
+---
+
+## === Session Helper (Python) (src/jetnet/session.py) ===
+
+```python
+"""
+session.py -- JETNET API session manager
+
+Handles login, token storage, health-checking via /getAccountInfo,
+and auto-refresh on token expiry. Use this as the single source of
+truth for all JETNET auth in your application.
+
+Usage:
+    from src.jetnet.session import login, ensure_session, jetnet_request
+
+    session = login("you@example.com", "yourpassword")
+    result  = jetnet_request("GET", "/api/Aircraft/getRegNumber/N12345/{apiToken}", session)
+"""
+
+from __future__ import annotations
+import os
+import time
+import requests
+from dataclasses import dataclass, field
+from typing import Optional
+
+BASE_URL = os.getenv("JETNET_BASE_URL", "https://customer.jetnetconnect.com")
+TOKEN_TTL_SECONDS = int(os.getenv("JETNET_TOKEN_TTL", "3000"))  # 50 min (tokens last ~60 min)
+
+
+@dataclass
+class SessionState:
+    base_url: str
+    email: str
+    password: str
+    bearer_token: str
+    api_token: str
+    created_at: float = field(default_factory=time.time)
+    last_validated_at: float = field(default_factory=time.time)
+
+    def age_seconds(self) -> float:
+        return time.time() - self.created_at
+
+    def seconds_since_validated(self) -> float:
+        return time.time() - self.last_validated_at
+
+    def is_stale(self, ttl: int = TOKEN_TTL_SECONDS) -> bool:
+        """True if the token has likely expired based on wall-clock age."""
+        return self.age_seconds() > ttl
+
+
+class JetnetError(Exception):
+    """Raised when JETNET returns an application-level error (HTTP 200 + bad status)."""
+    def __init__(self, message: str, endpoint: str = "", raw_status: str = ""):
+        self.endpoint = endpoint
+        self.raw_status = raw_status
+        super().__init__(message)
+
+
+def normalize_error(response_json: dict, endpoint: str = "") -> Optional[JetnetError]:
+    """
+    Detect application-level errors that arrive with HTTP 200.
+
+    JETNET can signal errors in two ways:
+      1. responsestatus starts with "ERROR" or contains "INVALID"
+      2. RFC-style error body with a "title" or "type" field
+
+    Returns a JetnetError if an error is detected, None otherwise.
+    """
+    status = response_json.get("responsestatus", "")
+    if status:
+        upper = status.upper()
+        if upper.startswith("ERROR") or "INVALID" in upper:
+            return JetnetError(
+                f"JETNET error: {status}",
+                endpoint=endpoint,
+                raw_status=status,
+            )
+
+    if "title" in response_json or "type" in response_json:
+        title = response_json.get("title", response_json.get("type", "Unknown error"))
+        return JetnetError(
+            f"API error: {title}",
+            endpoint=endpoint,
+            raw_status=str(response_json.get("status", "")),
+        )
+
+    return None
+
+
+def login(
+    email: Optional[str] = None,
+    password: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> SessionState:
+    """
+    Authenticate with the JETNET API and return a SessionState.
+
+    Reads JETNET_EMAIL / JETNET_PASSWORD / JETNET_BASE_URL from environment
+    if not passed directly.
+
+    IMPORTANT: emailAddress has a capital A -- this function handles that for you.
+    """
+    email    = email    or os.environ["JETNET_EMAIL"]
+    password = password or os.environ["JETNET_PASSWORD"]
+    url      = (base_url or BASE_URL).rstrip("/")
+
+    r = requests.post(
+        f"{url}/api/Admin/APILogin",
+        json={"emailAddress": email, "password": password},
+        timeout=30,
+    )
+    r.raise_for_status()
+    data = r.json()
+
+    err = normalize_error(data, endpoint="APILogin")
+    if err:
+        raise err
+
+    return SessionState(
+        base_url=url,
+        email=email,
+        password=password,
+        bearer_token=data["bearerToken"],
+        api_token=data.get("apiToken") or data.get("securityToken"),
+    )
+
+
+def get_account_info(session: SessionState) -> dict:
+    """
+    Call /getAccountInfo -- a lightweight, read-only probe endpoint.
+
+    Use this to:
+      - Verify a token is still valid before starting a long workflow
+      - Observe practical token TTL (see scripts/token_probe.py)
+      - Confirm the session is healthy after re-login
+
+    Returns the account info dict, or raises JetnetError if the token is invalid.
+    """
+    r = requests.get(
+        f"{session.base_url}/api/Admin/getAccountInfo/{session.api_token}",
+        headers={"Authorization": f"Bearer {session.bearer_token}"},
+        timeout=15,
+    )
+    r.raise_for_status()
+    data = r.json()
+
+    err = normalize_error(data, endpoint="getAccountInfo")
+    if err:
+        raise err
+
+    session.last_validated_at = time.time()
+    return data
+
+
+def ensure_session(session: SessionState) -> SessionState:
+    """
+    Validate the session before starting any workflow. Auto-refreshes once on expiry.
+
+    Call this at the start of any multi-step workflow (Golden Path, bulk export, etc.)
+    to prevent mid-workflow token failures.
+
+    Strategy:
+      1. If token looks stale by age, skip the probe and re-login immediately.
+      2. Otherwise call /getAccountInfo.
+      3. If /getAccountInfo fails, re-login once and retry.
+      4. If it still fails, raise -- credentials or service issue.
+    """
+    if session.is_stale():
+        return login(session.email, session.password, session.base_url)
+
+    try:
+        get_account_info(session)
+        return session
+    except (JetnetError, requests.HTTPError):
+        pass
+
+    try:
+        refreshed = login(session.email, session.password, session.base_url)
+        get_account_info(refreshed)
+        return refreshed
+    except Exception as e:
+        raise JetnetError(
+            f"Session refresh failed. Check credentials and connectivity. Original error: {e}",
+            endpoint="ensure_session",
+        ) from e
+
+
+def jetnet_request(
+    method: str,
+    path: str,
+    session: SessionState,
+    json: Optional[dict] = None,
+    timeout: int = 60,
+    auto_refresh: bool = True,
+) -> dict:
+    """
+    Make an authenticated JETNET API request.
+
+    Handles:
+      - Bearer token in Authorization header
+      - apiToken substitution in URL path
+      - Application-level error detection (HTTP 200 but responsestatus = ERROR)
+      - One automatic re-auth on INVALID SECURITY TOKEN
+
+    Args:
+        method:       "GET" or "POST"
+        path:         e.g. "/api/Aircraft/getRegNumber/N12345/{apiToken}"
+                      Use literal {apiToken} -- it will be substituted automatically.
+        session:      SessionState from login() or ensure_session()
+        json:         POST body dict (None for GET requests)
+        timeout:      Request timeout in seconds
+        auto_refresh: If True, re-login once on token error and retry
+
+    Returns:
+        Parsed JSON response dict
+
+    Raises:
+        JetnetError: on application-level errors
+        requests.HTTPError: on HTTP 4xx/5xx errors
+    """
+    url = f"{session.base_url}{path}".replace("{apiToken}", session.api_token)
+    headers = {
+        "Authorization": f"Bearer {session.bearer_token}",
+        "Content-Type": "application/json",
+    }
+
+    r = requests.request(method, url, headers=headers, json=json, timeout=timeout)
+    r.raise_for_status()
+    data = r.json()
+
+    err = normalize_error(data, endpoint=path)
+    if err:
+        if auto_refresh and "INVALID" in err.raw_status.upper():
+            refreshed = login(session.email, session.password, session.base_url)
+            return jetnet_request(method, path, refreshed, json=json,
+                                  timeout=timeout, auto_refresh=False)
+        raise err
+
+    return data
+
+
+def refresh_session(session: SessionState) -> SessionState:
+    """Force a fresh login regardless of token age. Returns a new SessionState."""
+    return login(session.email, session.password, session.base_url)
+```
+
+---
+
+## === Session Helper (TypeScript) (src/jetnet/session.ts) ===
+
+```typescript
+/**
+ * session.ts -- JETNET session helper (Node / TypeScript)
+ *
+ * Drop-in equivalent of session.py for Node / Next.js / Bun projects.
+ *
+ * Usage:
+ *   import { login, ensureSession, jetnetRequest } from './session'
+ *
+ *   const session = await login()                        // reads env vars
+ *   const data    = await jetnetRequest('GET',
+ *                     '/api/Aircraft/getRegNumber/N12345/{apiToken}',
+ *                     session)
+ *
+ * Environment variables (same names as Python helper):
+ *   JETNET_EMAIL     -- emailAddress (capital A matters on the server)
+ *   JETNET_PASSWORD  -- password
+ *   JETNET_BASE_URL  -- default: https://customer.jetnetconnect.com
+ */
+
+const DEFAULT_BASE_URL = 'https://customer.jetnetconnect.com'
+
+export interface SessionState {
+  baseUrl: string
+  email: string
+  password: string
+  bearerToken: string
+  apiToken: string
+  createdAt: number
+  lastValidatedAt: number
+}
+
+export interface JetnetErrorBody {
+  endpoint: string
+  status: string
+  detail?: string
+}
+
+export class JetnetError extends Error {
+  endpoint: string
+  status: string
+
+  constructor(endpoint: string, status: string, detail?: string) {
+    super(`JETNET error [${endpoint}]: ${status}${detail ? ' -- ' + detail : ''}`)
+    this.name = 'JetnetError'
+    this.endpoint = endpoint
+    this.status = status
+  }
+}
+
+function nowSeconds(): number {
+  return Date.now() / 1000
+}
+
+/**
+ * Detect JETNET application-level errors in a parsed response JSON.
+ * JETNET uses two error styles:
+ *   1. responsestatus starting with "ERROR" or "INVALID" (most endpoints)
+ *   2. RFC 7807: { "title": "...", "status": 400, "detail": "..." }
+ */
+function normalizeError(
+  responseJson: Record<string, unknown>,
+  endpoint = ''
+): JetnetError | null {
+  const rs = responseJson['responsestatus']
+  if (typeof rs === 'string') {
+    const upper = rs.toUpperCase()
+    if (upper.startsWith('ERROR') || upper.startsWith('INVALID')) {
+      return new JetnetError(endpoint, rs)
+    }
+  }
+
+  if ('title' in responseJson && 'status' in responseJson) {
+    const title = String(responseJson['title'] ?? '')
+    const detail = responseJson['detail'] ? String(responseJson['detail']) : undefined
+    return new JetnetError(endpoint, title, detail)
+  }
+
+  return null
+}
+
+const TOKEN_TTL_SECONDS = 50 * 60  // 50 min (tokens last ~60 min)
+
+/**
+ * Authenticate and return a new SessionState.
+ *
+ * CRITICAL: The field name is `emailAddress` with a capital A.
+ * Sending `email` or `emailaddress` returns HTTP 200 with an error body.
+ */
+export async function login(
+  email?: string,
+  password?: string,
+  baseUrl?: string
+): Promise<SessionState> {
+  const resolvedBaseUrl = baseUrl ?? process.env['JETNET_BASE_URL'] ?? DEFAULT_BASE_URL
+  const resolvedEmail = email ?? process.env['JETNET_EMAIL']
+  const resolvedPassword = password ?? process.env['JETNET_PASSWORD']
+
+  if (!resolvedEmail || !resolvedPassword) {
+    throw new Error(
+      'JETNET credentials missing. Set JETNET_EMAIL and JETNET_PASSWORD env vars ' +
+      'or pass email/password to login().'
+    )
+  }
+
+  const url = `${resolvedBaseUrl}/api/Admin/APILogin`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emailAddress: resolvedEmail, password: resolvedPassword }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`JETNET login HTTP ${response.status}: ${await response.text()}`)
+  }
+
+  const data = (await response.json()) as Record<string, unknown>
+  const err = normalizeError(data, 'APILogin')
+  if (err) throw err
+
+  const bearerToken = String(data['bearerToken'] ?? '')
+  const apiToken = String(data['apiToken'] ?? '')
+
+  if (!bearerToken || !apiToken) {
+    throw new Error(
+      'JETNET login returned no tokens. Check credentials. ' +
+      `Response: ${JSON.stringify(data).slice(0, 200)}`
+    )
+  }
+
+  const now = nowSeconds()
+  return {
+    baseUrl: resolvedBaseUrl,
+    email: resolvedEmail,
+    password: resolvedPassword,
+    bearerToken,
+    apiToken,
+    createdAt: now,
+    lastValidatedAt: now,
+  }
+}
+
+/**
+ * Call /getAccountInfo as a lightweight token health-check.
+ * Returns the raw response dict.
+ */
+export async function getAccountInfo(
+  session: SessionState
+): Promise<Record<string, unknown>> {
+  const url = `${session.baseUrl}/api/Admin/getAccountInfo/${session.apiToken}`
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${session.bearerToken}` },
+  })
+
+  if (!response.ok) {
+    throw new Error(`getAccountInfo HTTP ${response.status}`)
+  }
+
+  const data = (await response.json()) as Record<string, unknown>
+  const err = normalizeError(data, 'getAccountInfo')
+  if (err) throw err
+
+  return data
+}
+
+/**
+ * Return a valid session, refreshing if the token is stale.
+ *
+ * Strategy (three-tier defense):
+ *   1. Age check: if token is < TOKEN_TTL old, return as-is.
+ *   2. Probe /getAccountInfo; if it succeeds, update lastValidatedAt and return.
+ *   3. Full re-login. If that fails, throw -- do not swallow the error.
+ */
+export async function ensureSession(
+  session: SessionState
+): Promise<SessionState> {
+  const age = nowSeconds() - session.createdAt
+
+  if (age < TOKEN_TTL_SECONDS) {
+    return session
+  }
+
+  try {
+    await getAccountInfo(session)
+    return { ...session, lastValidatedAt: nowSeconds() }
+  } catch {
+    // Fall through to re-login
+  }
+
+  return await login(session.email, session.password, session.baseUrl)
+}
+
+/**
+ * Make an authenticated JETNET request.
+ *
+ * - Substitutes `{apiToken}` in the path automatically.
+ * - Retries once after a fresh login if the token appears invalid.
+ * - Throws JetnetError for application-level errors.
+ *
+ * @param method   'GET' | 'POST'
+ * @param path     Endpoint path, e.g. '/api/Aircraft/getRegNumber/N12345/{apiToken}'
+ * @param session  Current SessionState
+ * @param body     Optional POST body (will be JSON-serialized)
+ */
+export async function jetnetRequest(
+  method: 'GET' | 'POST',
+  path: string,
+  session: SessionState,
+  body?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const resolvedPath = path.replace('{apiToken}', session.apiToken)
+  const url = `${session.baseUrl}${resolvedPath}`
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${session.bearerToken}`,
+    'Content-Type': 'application/json',
+  }
+
+  const init: RequestInit = {
+    method,
+    headers,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  }
+
+  let response = await fetch(url, init)
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} ${response.statusText} -- ${url}`)
+  }
+
+  let data = (await response.json()) as Record<string, unknown>
+  let err = normalizeError(data, path)
+
+  if (err && typeof err.status === 'string' && err.status.toUpperCase().startsWith('INVALID')) {
+    const fresh = await login(session.email, session.password, session.baseUrl)
+    Object.assign(session, fresh)
+
+    const retryPath = path.replace('{apiToken}', fresh.apiToken)
+    const retryUrl = `${fresh.baseUrl}${retryPath}`
+    response = await fetch(retryUrl, {
+      ...init,
+      headers: { ...headers, Authorization: `Bearer ${fresh.bearerToken}` },
+    })
+    data = (await response.json()) as Record<string, unknown>
+    err = normalizeError(data, path)
+  }
+
+  if (err) throw err
+  return data
+}
+
+/**
+ * Convenience: call ensureSession then jetnetRequest in one step.
+ * Returns [updatedSession, responseData].
+ */
+export async function refreshAndRequest(
+  method: 'GET' | 'POST',
+  path: string,
+  session: SessionState,
+  body?: Record<string, unknown>
+): Promise<[SessionState, Record<string, unknown>]> {
+  const fresh = await ensureSession(session)
+  const data = await jetnetRequest(method, path, fresh, body)
+  return [fresh, data]
+}
+```
+
+---
+
+## === Full Endpoint Reference (references/endpoints.md) ===
+
+# JETNET API -- Full Endpoint Reference
+This file contains every endpoint with its parameters.
+Date parameters use `MM/DD/YYYY` format unless noted.
+
+## Admin
+
+### `POST` /api/Admin/APILogin
+**Customer APILogin**
+
+**Request body** (`ApiUser`):
+- `emailAddress` (string, capital A) -- ApiUser EmailAddress
+- `password` (string) -- ApiUser Password
+
+---
+
+### `GET` /api/Admin/getBearerToken
+**Get Bearer Token**
+
+---
+
+## Aircraft
+
+### `GET` /api/Aircraft/getAircraft/{id}/{securityToken}
+**Get ALL Aircraft data**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getIdentification/{id}/{securityToken}
+**Get Aircraft Identification**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getStatus/{id}/{securityToken}
+**Get Aircraft Status**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getAirframe/{id}/{securityToken}
+**Get Aircraft Airframe**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getEngine/{id}/{securityToken}
+**Get Aircraft Engines**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getApu/{id}/{securityToken}
+**Get Aircraft APU**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getCompanyrelationships/{id}/{securityToken}
+**Get Aircraft Company Relationships**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getMaintenance/{id}/{securityToken}
+**Get Aircraft Maintenance**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getAvionics/{id}/{securityToken}
+**Get Aircraft Avionics**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getFeatures/{id}/{securityToken}
+**Get Aircraft Features**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getAdditionalEquipment/{id}/{securityToken}
+**Get Aircraft Additional Equipment**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getInterior/{id}/{securityToken}
+**Get Aircraft Interior**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getExterior/{id}/{securityToken}
+**Get Aircraft Exterior**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getLeases/{id}/{securityToken}
+**Get Aircraft Leases**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getFlights/{id}/{securityToken}
+**Get Aircraft Flight Summary**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getPictures/{id}/{securityToken}
+**Get Aircraft Pictures**
+
+**Path params:**
+- `id`: Aircraft ID (required)
+
+---
+
+### `GET` /api/Aircraft/getRegNumber/{reg}/{securityToken}
+**Get simple aircraft info by tail number**
+
+**Path params:**
+- `reg`: Registration Number (required)
+
+---
+
+### `GET` /api/Aircraft/getHexNumber/{hex}/{securityToken}
+**Get simple aircraft info by hexcode number**
+
+**Path params:**
+- `hex`: Hexcode Number (required)
+
+---
+
+### `POST` /api/Aircraft/getAircraftList/{securityToken}
+**Get Aircraft List**
+
+**Request body** (`AcListOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `showHistoricalAcRefs` (boolean)
+- `showAwaitingDocsCompanies` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getEventList/{securityToken}
+**Get Aircraft Events**
+
+**Request body** (`AcEventsOptions`):
+- `aircraftid` (integer)
+- `modelid` (integer)
+- `make` (string)
+- `evcategory` (array)
+- `evtype` (array)
+- `startdate` (string)
+- `enddate` (string)
+- `aclist` (array)
+- `modlist` (array)
+
+---
+
+### `POST` /api/Aircraft/getEventListPaged/{securityToken}/{pagesize}/{page}
+**Get Aircraft Events Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AcEventsOptions`):
+- `aircraftid` (integer)
+- `modelid` (integer)
+- `make` (string)
+- `evcategory` (array)
+- `evtype` (array)
+- `startdate` (string)
+- `enddate` (string)
+- `aclist` (array)
+- `modlist` (array)
+
+---
+
+### `POST` /api/Aircraft/getHistoryList/{securityToken}
+**Get Aircraft History**
+
+**Request body** (`AcHistoryOptions`):
+- `aircraftid` (integer)
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `modelid` (integer)
+- `make` (string)
+- `companyid` (integer)
+- `isnewaircraft` (eYesNoIgnoreFlag)
+- `allrelationships` (boolean)
+- `transtype` (array)
+- `startdate` (string)
+- `enddate` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `lastactionstartdate` (string)
+- `lastactionenddate` (string)
+- `ispreownedtrans` (eYesNoIgnoreFlag)
+- `isretailtrans` (eYesNoIgnoreFlag)
+- `isinternaltrans` (eYesNoIgnoreFlag)
+
+---
+
+### `POST` /api/Aircraft/getHistoryListPaged/{securityToken}/{pagesize}/{page}
+**Get Aircraft History Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AcHistoryOptions`):
+- `aircraftid` (integer)
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `modelid` (integer)
+- `make` (string)
+- `companyid` (integer)
+- `isnewaircraft` (eYesNoIgnoreFlag)
+- `allrelationships` (boolean)
+- `transtype` (array)
+- `startdate` (string)
+- `enddate` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `lastactionstartdate` (string)
+- `lastactionenddate` (string)
+- `ispreownedtrans` (eYesNoIgnoreFlag)
+- `isretailtrans` (eYesNoIgnoreFlag)
+- `isinternaltrans` (eYesNoIgnoreFlag)
+
+---
+
+### `POST` /api/Aircraft/getRelationships/{securityToken}
+**Get Aircraft Relationships**
+
+**Request body** (`AcRelationshipOptions`):
+- `aircraftid` (integer)
+- `aclist` (array)
+- `modlist` (array)
+- `actiondate` (string)
+- `showHistoricalAcRefs` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getFlightData/{securityToken}
+**Get Aircraft Flight Data**
+
+**Request body** (`AcFlightDataOptions`):
+- `aircraftid` (integer)
+- `airframetype` (eAirFrameTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `maketype` (eMakeTypes)
+- `modelid` (integer)
+- `make` (string)
+- `origin` (string)
+- `destination` (string)
+- `startdate` (string)
+- `enddate` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `lastactionstartdate` (string)
+- `lastactionenddate` (string)
+- `exactMatchReg` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getFlightDataPaged/{securityToken}/{pagesize}/{page}
+**Get Aircraft Flight Data Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AcFlightDataOptions`):
+- `aircraftid` (integer)
+- `airframetype` (eAirFrameTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `maketype` (eMakeTypes)
+- `modelid` (integer)
+- `make` (string)
+- `origin` (string)
+- `destination` (string)
+- `startdate` (string)
+- `enddate` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `lastactionstartdate` (string)
+- `lastactionenddate` (string)
+- `exactMatchReg` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getCondensedOwnerOperators/{securityToken}
+**Get Aircraft Condensed Owner / Operators List**
+
+**Request body** (`AcListOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `showHistoricalAcRefs` (boolean)
+- `showAwaitingDocsCompanies` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getCondensedOwnerOperatorsPaged/{securityToken}/{pagesize}/{page}
+**Get Aircraft Condensed Owner / Operators List Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AcListOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `showHistoricalAcRefs` (boolean)
+- `showAwaitingDocsCompanies` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getCondensedSnapshot/{securityToken}
+**Get Aircraft Condensed Owner / Operators Historical Snapshot**
+
+**Request body** (`AcSnapshotOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `snapshotdate` (string)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getAcCompanyFractionalReport/{securityToken}
+**Get Aircraft Fractional Info**
+
+**Request body** (`AircraftReportOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `fractionexpiresdate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `bustype` (array)
+- `relationship` (array)
+- `ownertype` (array)
+
+---
+
+### `POST` /api/Aircraft/getAcCompanyFractionalReportPaged/{securityToken}/{pagesize}/{page}
+**Get Aircraft Fractional Info Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AircraftReportOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `fractionexpiresdate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `bustype` (array)
+- `relationship` (array)
+- `ownertype` (array)
+
+---
+
+### `POST` /api/Aircraft/getAcSellerPurchaserReport/{securityToken}
+**Get Aircraft Seller Purchaser Report**
+
+**Request body** (`AircraftReportOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `fractionexpiresdate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `bustype` (array)
+- `relationship` (array)
+- `ownertype` (array)
+
+---
+
+### `POST` /api/Aircraft/getAcSellerPurchaserReportPaged/{securityToken}/{pagesize}/{page}
+**Get Aircraft Seller Purchaser Report Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AircraftReportOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `fractionexpiresdate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `bustype` (array)
+- `relationship` (array)
+- `ownertype` (array)
+
+---
+
+### `POST` /api/Aircraft/getBulkAircraftExport/{securityToken}
+**Get Bulk Export of Aircraft Record Lists**
+
+**Request body** (`AcListOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `showHistoricalAcRefs` (boolean)
+- `showAwaitingDocsCompanies` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getBulkAircraftExportPaged/{securityToken}/{pagesize}/{page}
+**Get Bulk Export of Aircraft Record Lists Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AcListOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `sernbr` (string)
+- `regnbr` (string)
+- `regnbrlist` (array)
+- `modelid` (integer)
+- `make` (string)
+- `makelist` (array)
+- `forsale` (string)
+- `lifecycle` (eLifeCycle)
+- `basestate` (array)
+- `basestatename` (array)
+- `basecountry` (string)
+- `basecountrylist` (array)
+- `basecode` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `companyid` (integer)
+- `complist` (array)
+- `contactid` (integer)
+- `yearmfr` (integer)
+- `yeardlv` (integer)
+- `aircraftchanges` (string)
+- `aclist` (array)
+- `modlist` (array)
+- `exactMatchReg` (boolean)
+- `showHistoricalAcRefs` (boolean)
+- `showAwaitingDocsCompanies` (boolean)
+
+---
+
+### `POST` /api/Aircraft/getAllAircraftObjects/{securityToken}/{pagesize}/{page}
+**Get ALL Aircraft Object Data **
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`AcObjectListOptions`):
+- `aclist` (array)
+
+---
+
+## Company
+
+### `GET` /api/Company/getCompany/{id}/{securityToken}
+**Get ALL Company data**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getIdentification/{id}/{securityToken}
+**Get Identification**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getContacts/{id}/{securityToken}
+**Get Contacts**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getPhonenumbers/{id}/{securityToken}
+**Get Phone Numbers**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getBusinesstypes/{id}/{securityToken}
+**Get Business Types**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getAircraftrelationships/{id}/{securityToken}
+**Get Aircraft Relationships**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getRelatedcompanies/{id}/{securityToken}
+**Get Related Companies**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `GET` /api/Company/getCompanyCertifications/{id}/{securityToken}
+**Get Company Certifications**
+
+**Path params:**
+- `id`: Company ID (required)
+
+---
+
+### `POST` /api/Company/getCompanyList/{securityToken}
+**Get Company List**
+
+**Request body** (`CompListOptions`):
+- `aircraftid` (array)
+- `name` (string)
+- `country` (string)
+- `city` (string)
+- `state` (array)
+- `statename` (array)
+- `bustype` (array)
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `modelid` (array)
+- `make` (array)
+- `relationship` (array)
+- `isoperator` (string)
+- `actiondate` (string)
+- `companychanges` (string)
+- `website` (string)
+- `complist` (array)
+
+---
+
+### `POST` /api/Company/getCompanyListPaged/{securityToken}/{pagesize}/{page}
+**Get Company List Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`CompListOptions`):
+- `aircraftid` (array)
+- `name` (string)
+- `country` (string)
+- `city` (string)
+- `state` (array)
+- `statename` (array)
+- `bustype` (array)
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `modelid` (array)
+- `make` (array)
+- `relationship` (array)
+- `isoperator` (string)
+- `actiondate` (string)
+- `companychanges` (string)
+- `website` (string)
+- `complist` (array)
+
+---
+
+### `POST` /api/Company/getCompanyHistory/{securityToken}
+**Get Company History List**
+
+**Request body** (`CompHistoryOptions`):
+- `companyid` (integer)
+- `complist` (array)
+- `aircraftid` (integer)
+- `aclist` (array)
+- `transtype` (array)
+- `relationship` (array)
+- `startdate` (string)
+- `enddate` (string)
+- `lastactionstartdate` (string)
+- `lastactionenddate` (string)
+- `isinternaltrans` (eYesNoIgnoreFlag)
+- `isoperator` (eYesNoIgnoreFlag)
+
+---
+
+### `POST` /api/Company/getCompanyHistoryPaged/{securityToken}/{pagesize}/{page}
+**Get Company History List Paged**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`CompHistoryOptions`):
+- `companyid` (integer)
+- `complist` (array)
+- `aircraftid` (integer)
+- `aclist` (array)
+- `transtype` (array)
+- `relationship` (array)
+- `startdate` (string)
+- `enddate` (string)
+- `lastactionstartdate` (string)
+- `lastactionenddate` (string)
+- `isinternaltrans` (eYesNoIgnoreFlag)
+- `isoperator` (eYesNoIgnoreFlag)
+
+---
+
+## Contact
+
+### `GET` /api/Contact/getContact/{id}/{securityToken}
+**Get ALL Contact**
+
+**Path params:**
+- `id`: Contact ID (required)
+
+---
+
+### `GET` /api/Contact/getIdentification/{id}/{securityToken}
+**Get Identification**
+
+**Path params:**
+- `id`: Contact ID (required)
+
+---
+
+### `GET` /api/Contact/getPhonenumbers/{id}/{securityToken}
+**Get Phone Numbers**
+
+**Path params:**
+- `id`: Contact ID (required)
+
+---
+
+### `GET` /api/Contact/getContAircraftRelationships/{id}/{securityToken}
+**Get Aircraft Relationships**
+
+**Path params:**
+- `id`: Contact ID (required)
+
+---
+
+### `GET` /api/Contact/getOtherlistings/{id}/{securityToken}
+**Get Other Listings**
+
+**Path params:**
+- `id`: Contact ID (required)
+
+---
+
+### `POST` /api/Contact/getContactList/{securityToken}
+**Get Contact List**
+
+**Request body** (`ContListOptions`):
+- `aircraftid` (array)
+- `companyid` (integer)
+- `companyname` (string)
+- `firstname` (string)
+- `lastname` (string)
+- `title` (string)
+- `email` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `phonenumber` (string)
+- `contactchanges` (string)
+- `contlist` (array)
+- `complist` (array)
+
+---
+
+### `POST` /api/Contact/getContactListPaged/{securityToken}/{pagesize}/{page}
+**Get Contact List**
+
+**Path params:**
+- `pagesize`: Page Size (required)
+- `page`: Page (required)
+
+**Request body** (`ContListOptions`):
+- `aircraftid` (array)
+- `companyid` (integer)
+- `companyname` (string)
+- `firstname` (string)
+- `lastname` (string)
+- `title` (string)
+- `email` (string)
+- `actiondate` (string)
+- `enddate` (string)
+- `phonenumber` (string)
+- `contactchanges` (string)
+- `contlist` (array)
+- `complist` (array)
+
+---
+
+## Model
+
+### `POST` /api/Model/getModelMarketTrends/{securityToken}
+**Get Model Market Trends**
+
+**Request body** (`ModelTrendOptions`):
+- `modlist` (array)
+- `displayRange` (integer)
+- `startdate` (string)
+- `enddate` (string)
+- `productcode` (array)
+
+---
+
+### `POST` /api/Model/getModelOperationCosts/{securityToken}
+**Get Model Operation Costs**
+
+**Request body** (`ModelPerformanceOptions`):
+- `modlist` (array)
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `make` (string)
+- `annualhours` (integer)
+- `fuelprice` (integer)
+
+---
+
+### `POST` /api/Model/getModelPerformanceSpecs/{securityToken}
+**Get Model Performance Specs**
+
+**Request body** (`ModelPerformanceOptions`):
+- `modlist` (array)
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `make` (string)
+- `annualhours` (integer)
+- `fuelprice` (integer)
+
+---
+
+## Utility
+
+### `GET` /api/Utility/getAccountInfo/{securityToken}
+**Get my user account**
+
+---
+
+### `GET` /api/Utility/getProductCodes/{securityToken}
+**Get my product codes**
+
+---
+
+### `GET` /api/Utility/getAirframeTypes/{securityToken}
+**Get Aircraft Airframes**
+
+---
+
+### `POST` /api/Utility/getMakeTypeList/{securityToken}
+**Get Aircraft Make Types**
+
+**Request body** (`AcAirframeOptions`):
+- `airframetype` (eAirFrameTypes)
+
+---
+
+### `GET` /api/Utility/getWeightClassTypes/{securityToken}
+**Get Aircraft Weight Classes**
+
+---
+
+### `GET` /api/Utility/getAirframeJniqSizes/{securityToken}
+**Get Aircraft Jniq Sizes**
+
+---
+
+### `POST` /api/Utility/getAircraftMakeList/{securityToken}
+**Get Aircraft Makes**
+
+**Request body** (`AcMakeOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+
+---
+
+### `POST` /api/Utility/getAircraftModelList/{securityToken}
+**Get Aircraft Models**
+
+**Request body** (`AcModelOptions`):
+- `airframetype` (eAirFrameTypes)
+- `maketype` (eMakeTypes)
+- `make` (string)
+
+---
+
+### `GET` /api/Utility/getCompanyBusinessTypes/{securityToken}
+**Get Company Business Types**
+
+---
+
+### `GET` /api/Utility/getAircraftCompanyRelationships/{securityToken}
+**Get Aircraft Company Relationship Types**
+
+---
+
+### `GET` /api/Utility/getEventCategories/{securityToken}
+**Get Aircraft Event Categories**
+
+---
+
+### `POST` /api/Utility/getEventTypes/{securityToken}
+**Get Aircraft Event Types**
+
+**Request body** (`AcEventOptions`):
+- `eventcategory` (string)
+
+---
+
+### `POST` /api/Utility/getAirportList/{securityToken}
+**Get Airport List**
+
+**Request body** (`AirportOptions`):
+- `name` (string)
+- `city` (string)
+- `state` (array)
+- `statename` (array)
+- `country` (string)
+- `iata` (string)
+- `icao` (string)
+- `faaid` (string)
+
+---
+
+### `POST` /api/Utility/getStateList/{securityToken}
+**Get State List**
+
+**Request body** (`CountryOptions`):
+- `country` (string)
+
+---
+
+### `GET` /api/Utility/getCountryList/{securityToken}
+**Get Country List**
+
+---
+
+### `GET` /api/Utility/getAircraftLifecycleStatus/{securityToken}
+**Get Aircraft LifeCycle Types**
+
+---
+
+### `GET` /api/Utility/getAircraftHistoryTransTypes/{securityToken}
+**Get Aircraft History Transaction Types**
+
+---

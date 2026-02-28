@@ -74,6 +74,8 @@ You want to enrich contacts, generate leads, or monitor ownership changes.
 
 You want to give an AI agent (Cursor, Copilot, custom GPT, LangChain, CrewAI, or your own) the ability to call the JETNET API.
 
+**Quickest path:** Feed [`llms.txt`](llms.txt) into your agent's context window. It contains every rule, gotcha, enum value, and response key in ~150 lines. For agents with large context windows, use [`llms-full.txt`](llms-full.txt) (~3100 lines, all docs).
+
 1. **Feed your agent the rules:** Copy [`src/jetnet/session.py`](src/jetnet/session.py) (Python) or [`src/jetnet/session.ts`](src/jetnet/session.ts) (TypeScript) into your agent's context -- it handles auth, token refresh, and error normalization automatically
 2. **Give it the model reference:** Load [`references/model-id-table.json`](references/model-id-table.json) so your agent can resolve aircraft makes/models to the correct `modlist` IDs (872 models across 67 makes)
 3. **Use the prompt recipes:** Paste any of the [`prompts/`](prompts/) into your agent as system instructions -- they are self-contained with API call sequences, error rules, and response shapes
@@ -84,19 +86,22 @@ You want to give an AI agent (Cursor, Copilot, custom GPT, LangChain, CrewAI, or
 
 | File | Purpose | Size |
 |------|---------|------|
-| [`src/jetnet/session.py`](src/jetnet/session.py) | Auth + session management (drop into agent) | ~150 lines |
+| [`llms.txt`](llms.txt) | Single-file AI reference (all rules + gotchas + enums) | ~150 lines |
+| [`llms-full.txt`](llms-full.txt) | Complete reference (all docs concatenated) | ~3100 lines |
+| [`src/jetnet/session.py`](src/jetnet/session.py) | Auth + session management (drop into agent) | ~240 lines |
 | [`references/model-id-table.json`](references/model-id-table.json) | Model ID lookup (agent can resolve "G550" → modlist: [278]) | 872 entries |
-| [`docs/response-shapes.md`](docs/response-shapes.md) | Response contracts for structured output | ~200 lines |
-| [`docs/common-mistakes.md`](docs/common-mistakes.md) | Guardrails to prevent agent errors | ~100 lines |
-| [`evals/evals.json`](evals/evals.json) | Test cases for agent validation | ~50 cases |
+| [`docs/response-shapes.md`](docs/response-shapes.md) | Response contracts for structured output | ~440 lines |
+| [`docs/common-mistakes.md`](docs/common-mistakes.md) | Guardrails to prevent agent errors | ~170 lines |
+| [`evals/evals.json`](evals/evals.json) | Test cases for agent validation | 3 cases |
 | [`prompts/`](prompts/) | 4 ready-to-use system prompts | ~200 lines each |
 
 **Quick agent setup pattern:**
 
 ```python
-system_prompt = open("prompts/01_golden_path_tail_lookup_app.md").read()
+context = open("llms.txt").read()
 model_ids = json.load(open("references/model-id-table.json"))
-common_mistakes = open("docs/common-mistakes.md").read()
+
+system_prompt = open("prompts/01_golden_path_tail_lookup_app.md").read()
 ```
 
 ---
