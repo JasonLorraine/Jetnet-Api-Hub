@@ -93,15 +93,15 @@ Then point any MCP client at `http://your-server:8000/mcp`.
 
 ## Available Tools
 
-The MCP server exposes **8 tools** that cover the most common JETNET workflows.
+The MCP server exposes **11 tools** that cover the most common JETNET workflows.
 Each tool handles authentication, token refresh, pagination, and error handling
-automatically — the AI agent just calls the tool with the right parameters.
+automatically -- the AI agent just calls the tool with the right parameters.
 
 ### Core Tools
 
 | Tool | What It Does | Key Parameters |
 |------|-------------|----------------|
-| `jetnet_golden_path` | **Complete aircraft profile** — tail lookup + owner/operator + pictures in one call. The recommended starting point. | `registration` |
+| `jetnet_golden_path` | **Complete aircraft profile** -- tail lookup + owner/operator + pictures in one call. The recommended starting point. | `registration` |
 | `jetnet_lookup_aircraft` | Look up a single aircraft by tail/registration number. Returns `aircraftid` needed by all other tools. | `registration` |
 | `jetnet_get_relationships` | Get owner, operator, manager, trustee relationships for an aircraft. | `aircraftid` |
 | `jetnet_get_flight_data` | Flight activity within a date range: departure/arrival airports, dates, utilization. | `aircraftid`, `start_date`, `end_date` |
@@ -113,12 +113,15 @@ automatically — the AI agent just calls the tool with the right parameters.
 | `jetnet_search_fleet` | Search the fleet database by model, make, for-sale status, country. Find inventory and listings. | `modlist`, `for_sale`, `country` |
 | `jetnet_get_history` | Transaction history: sales, deliveries, registrations within a date range. | `modlist` or `aclist`, date range |
 | `jetnet_get_market_trends` | Market analytics: for-sale count, avg asking price, days on market over time. | `modelid`, date range |
+| `jetnet_get_snapshot` | Fleet snapshot at a historical point in time: fleet size, for-sale count, composition. | `modlist`, `snapshot_date`, `country` |
+| `jetnet_get_model_specs` | Performance specifications: range, speed, cabin dimensions, payload, engines. | `modelid` |
 
 ### Utility Tools
 
 | Tool | What It Does | Key Parameters |
 |------|-------------|----------------|
 | `jetnet_search_models` | Find JETNET model IDs (AMODID) by name, make, or ICAO code. Use these IDs in `modlist`. | `query` (e.g., "G550") |
+| `jetnet_health_check` | Verify JETNET connection and credentials are valid. Call first if other tools return errors. | *(none)* |
 
 ---
 

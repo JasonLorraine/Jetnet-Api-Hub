@@ -9,6 +9,8 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 > Demo UI | Bulk Data | CRM Enrichment | **AI Agent / Code Agent**
 >
 > **AI / LLM?** Ingest [`llms.txt`](llms.txt) (concise) or [`llms-full.txt`](llms-full.txt) (complete) for your context window.
+>
+> **MCP (AI Agent)?** See [`mcp/`](mcp/) -- connect Claude Desktop, Cursor, Copilot, or any MCP client directly to JETNET. Zero code required.
 
 ---
 
@@ -27,6 +29,7 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 - [Quick Reference Snippets](#quick-reference-snippets)
 - [Helper Scripts](#helper-scripts)
 - [References](#references)
+- [MCP Server (AI Agent Integration)](#mcp-server-ai-agent-integration)
 - [Common Mistakes](#common-mistakes)
 
 ---
@@ -206,7 +209,8 @@ jetnet-api-docs/
 │   ├── 01_golden_path_tail_lookup_app.md
 │   ├── 02_fbo_airport_activity_leads.md
 │   ├── 03_fleet_watchlist_alerts.md
-│   └── 04_bulk_export_pipeline.md
+│   ├── 04_bulk_export_pipeline.md
+│   └── 05_mcp_agent_workflow.md       ← MCP natural language workflow
 │
 ├── mcp/                               ← MCP server (AI agent integration)
 │   ├── jetnet_mcp.py                 ← Python MCP server (stdio + HTTP)
@@ -294,7 +298,7 @@ See the full working implementation:
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |
-| [MCP Server](mcp/README.md) | AI agent integration: 8 tools for Claude Desktop, Cursor, Copilot |
+| [MCP Server](mcp/README.md) | AI agent integration: 11 tools for Claude Desktop, Cursor, Copilot |
 
 ---
 
@@ -369,8 +373,59 @@ Copy-paste these into Cursor, Copilot, or ChatGPT to generate working apps that 
 | [02 FBO Airport Activity Leads](prompts/02_fbo_airport_activity_leads.md) | Airport-based flight activity for FBO lead generation |
 | [03 Fleet Watchlist Alerts](prompts/03_fleet_watchlist_alerts.md) | Monitor a fleet by model, alert on ownership changes |
 | [04 Bulk Export Pipeline](prompts/04_bulk_export_pipeline.md) | Paginated bulk export with incremental sync |
+| [05 MCP Agent Workflow](prompts/05_mcp_agent_workflow.md) | Natural language aviation intelligence via MCP tools |
 
 Each prompt includes the exact API call sequence, error handling rules, and references the session helpers. See [`prompts/README.md`](prompts/README.md) for how to use them.
+
+---
+
+## MCP Server (AI Agent Integration)
+
+> **The first aviation data API with native AI agent support.**
+
+The [`mcp/`](mcp/) directory contains a production-ready [Model Context Protocol](https://modelcontextprotocol.io/) server that lets AI agents query JETNET data directly -- no code required on the user's side.
+
+**What this means:** A user opens Claude Desktop and says *"What G650s are for sale in the US?"* -- Claude calls JETNET, gets the data, and responds. No integration code written.
+
+### Quick Start (Claude Desktop)
+
+```bash
+pip install mcp httpx pydantic
+```
+
+Add to `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "jetnet": {
+      "command": "python",
+      "args": ["/path/to/mcp/jetnet_mcp.py"],
+      "env": {
+        "JETNET_EMAIL": "your_email@example.com",
+        "JETNET_PASSWORD": "your_password"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | What It Does |
+|------|-------------|
+| `jetnet_golden_path` | Complete aircraft profile: tail lookup + owner/operator + pictures in one call |
+| `jetnet_lookup_aircraft` | Look up aircraft by tail number, returns `aircraftid` |
+| `jetnet_get_relationships` | Owner, operator, manager relationships |
+| `jetnet_get_flight_data` | Flight activity within a date range |
+| `jetnet_search_fleet` | Search by model, for-sale status, country |
+| `jetnet_get_history` | Transaction history (sales, deliveries) |
+| `jetnet_get_market_trends` | Pricing, days-on-market, inventory over time |
+| `jetnet_search_models` | Find model IDs (AMODID) by name/ICAO |
+| `jetnet_get_snapshot` | Fleet snapshot at a historical point in time |
+| `jetnet_get_model_specs` | Performance specs: range, speed, cabin, payload |
+| `jetnet_health_check` | Verify JETNET connection and credentials |
+
+Full documentation: [`mcp/README.md`](mcp/README.md)
 
 ---
 

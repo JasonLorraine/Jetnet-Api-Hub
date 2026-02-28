@@ -20,12 +20,20 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    stream=sys.stderr,
+)
+log = logging.getLogger("jetnet_mcp")
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -747,6 +755,161 @@ async def jetnet_search_models(params: ModelSearchInput, ctx=None) -> str:
     lines.append(f"\n**Usage**: Use the AMODID values in `modlist` parameter of other tools.")
 
     return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOOL: FLEET SNAPSHOT (getCondensedSnapshot)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class SnapshotInput(BaseModel):
+    """Get fleet snapshot at a point in time."""
+    model_config = ConfigDict(extra="forbid")
+
+    modlist: List[int] = Field(
+        default_factory=list,
+        description="Model IDs to filter by. Empty = all models.",
+    )
+    snapshot_date: str = Field(
+        ...,
+        description="Snapshot date MM/DD/YYYY (e.g., '01/01/2025')",
+        pattern=r"^\d{2}/\d{2}/\d{4}$",
+    )
+    country: str = Field(
+        default="",
+        description="Country filter. Empty = all countries.",
+    )
+    response_format: ResponseFormat = Field(
+        default=ResponseFormat.MARKDOWN, description="Output format",
+    )
+
+
+@mcp.tool(
+    name="jetnet_get_snapshot",
+    annotations={
+        "title": "Get Fleet Snapshot at Point in Time",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def jetnet_get_snapshot(params: SnapshotInput, ctx=None) -> str:
+    """Get a condensed fleet snapshot at a specific point in time.
+    Shows fleet size, for-sale count, and composition for a model
+    on a given date. Perfect for year-over-year fleet comparisons
+    and historical fleet analysis.
+    """
+    session = _get_session(ctx)
+    body = {
+        "modlist": params.modlist,
+        "snapshotdate": params.snapshot_date,
+        "country": params.country,
+        "airframetype": "None",
+        "maketype": "None",
+    }
+    data = await session.request(
+        "POST", "/api/Aircraft/getCondensedSnapshot/{apiToken}", body
+    )
+    if params.response_format == ResponseFormat.JSON:
+        return _truncate(json.dumps(data, indent=2, default=str))
+
+    snapshot = data.get("snapshotowneroperators", data.get("snapshot", []))
+    lines = ["## Fleet Snapshot", f"**Date**: {params.snapshot_date}", ""]
+    if isinstance(snapshot, list):
+        lines.append(f"**Records**: {len(snapshot)}")
+        for item in snapshot[:20]:
+            lines.append(f"- {json.dumps(item, default=str)}")
+        if len(snapshot) > 20:
+            lines.append(f"\n*...{len(snapshot) - 20} more. Use json format for complete list.*")
+    elif isinstance(snapshot, dict):
+        for k, v in snapshot.items():
+            if k != "responsestatus":
+                lines.append(f"- **{k}**: {v}")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOOL: MODEL SPECS (getModelPerformanceSpecs)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ModelSpecsInput(BaseModel):
+    """Get performance specifications for an aircraft model."""
+    model_config = ConfigDict(extra="forbid")
+
+    modelid: int = Field(
+        ..., description="JETNET model ID. Use jetnet_search_models to find it.", gt=0,
+    )
+    response_format: ResponseFormat = Field(
+        default=ResponseFormat.MARKDOWN, description="Output format",
+    )
+
+
+@mcp.tool(
+    name="jetnet_get_model_specs",
+    annotations={
+        "title": "Get Aircraft Model Specifications",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def jetnet_get_model_specs(params: ModelSpecsInput, ctx=None) -> str:
+    """Get performance specifications for an aircraft model: range, speed,
+    cabin dimensions, max passengers, payload, and engine details.
+
+    Use jetnet_search_models first to find the modelid.
+    """
+    session = _get_session(ctx)
+    body = {"modelid": params.modelid}
+    data = await session.request(
+        "POST", "/api/Model/getModelPerformanceSpecs/{apiToken}", body
+    )
+    if params.response_format == ResponseFormat.JSON:
+        return _truncate(json.dumps(data, indent=2, default=str))
+
+    specs = data.get("specs", data.get("modelperformancespecs", data))
+    lines = [f"## Model Specifications -- Model {params.modelid}", ""]
+    if isinstance(specs, dict):
+        for k, v in specs.items():
+            if k != "responsestatus" and v:
+                label = k.replace("_", " ").title()
+                lines.append(f"- **{label}**: {v}")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOOL: HEALTH CHECK
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class HealthCheckInput(BaseModel):
+    """Check JETNET connection health."""
+    model_config = ConfigDict(extra="forbid")
+
+
+@mcp.tool(
+    name="jetnet_health_check",
+    annotations={
+        "title": "Check JETNET Connection",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def jetnet_health_check(params: HealthCheckInput, ctx=None) -> str:
+    """Check if JETNET credentials are valid and the API is reachable.
+    Call this first if other tools are returning errors.
+    """
+    session = _get_session(ctx)
+    try:
+        await session.ensure_valid()
+        data = await session.request(
+            "GET", "/api/Admin/getAccountInfo/{apiToken}"
+        )
+        return f"Connected to JETNET. Token valid. Account: {json.dumps(data, indent=2, default=str)}"
+    except Exception as e:
+        return f"Connection failed: {str(e)}. Check JETNET_EMAIL and JETNET_PASSWORD."
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

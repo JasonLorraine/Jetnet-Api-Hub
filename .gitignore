@@ -10,6 +10,9 @@ replit.nix
 # Uploaded raw assets (not for public repo)
 attached_assets/
 
+# MCP
+.mcp/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

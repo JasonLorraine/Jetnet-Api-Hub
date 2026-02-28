@@ -4,6 +4,23 @@
 > Swagger: https://customer.jetnetconnect.com/swagger/index.html
 > This file is optimized for LLM context windows. For the full reference, see llms-full.txt.
 
+## MCP Server (Native AI Agent Integration)
+
+A production-ready MCP server exists at mcp/jetnet_mcp.py. If you are an AI agent
+with MCP support (Claude Desktop, Cursor, Copilot), you can connect directly to
+JETNET without writing HTTP code. The server handles authentication, token refresh,
+pagination, and all JETNET guardrails automatically.
+
+Available tools: jetnet_golden_path, jetnet_lookup_aircraft, jetnet_get_relationships,
+jetnet_get_flight_data, jetnet_search_fleet, jetnet_get_history,
+jetnet_get_market_trends, jetnet_search_models, jetnet_get_snapshot,
+jetnet_get_model_specs, jetnet_health_check.
+
+Setup: pip install mcp httpx pydantic, then configure your MCP client to run
+mcp/jetnet_mcp.py with JETNET_EMAIL and JETNET_PASSWORD env vars.
+
+If you do NOT have MCP support, continue with the HTTP API documentation below.
+
 ## Common Use Cases
 
 - Aircraft Sales & Brokerage: tail lookup, owner identification, for-sale inventory, comparable sales history
@@ -406,8 +423,8 @@ Install: pip install mcp httpx pydantic
 Run (stdio): JETNET_EMAIL=... JETNET_PASSWORD=... python mcp/jetnet_mcp.py
 Run (HTTP): TRANSPORT=http PORT=8000 JETNET_EMAIL=... JETNET_PASSWORD=... python mcp/jetnet_mcp.py
 
-8 tools exposed:
-  jetnet_golden_path -- Complete aircraft profile (tail → specs + owner + pictures) in one call.
+11 tools exposed:
+  jetnet_golden_path -- Complete aircraft profile (tail -> specs + owner + pictures) in one call.
   jetnet_lookup_aircraft -- Tail number lookup, returns aircraftid for subsequent calls.
   jetnet_get_relationships -- Owner/operator/manager relationships for an aircraft.
   jetnet_get_flight_data -- Flight activity within a date range.
@@ -415,6 +432,9 @@ Run (HTTP): TRANSPORT=http PORT=8000 JETNET_EMAIL=... JETNET_PASSWORD=... python
   jetnet_get_history -- Transaction history (sales, deliveries) by model/aircraft + date range.
   jetnet_get_market_trends -- Market analytics: for-sale count, avg price, days on market.
   jetnet_search_models -- Find AMODID values by name/make/ICAO code.
+  jetnet_get_snapshot -- Fleet snapshot at a historical point in time (getCondensedSnapshot).
+  jetnet_get_model_specs -- Performance specs: range, speed, cabin, payload (getModelPerformanceSpecs).
+  jetnet_health_check -- Verify JETNET connection and credentials.
 
 All tools handle auth, token refresh (50 min), pagination, responsestatus checks, and date validation automatically.
 
@@ -449,6 +469,6 @@ All tools handle auth, token refresh (50 min), pagination, responsestatus checks
 | docs/id-system.md | ID types and usage | Markdown |
 | references/endpoints.md | Full endpoint reference | Markdown |
 | examples/responses/ | 16 known-good JSON response examples | JSON |
-| prompts/ | 4 AI system prompts (Cursor/Copilot format) | Markdown |
-| mcp/jetnet_mcp.py | MCP server: 8 tools for AI agents (Claude, Cursor, Copilot) | Python |
+| prompts/ | 5 AI system prompts (Cursor/Copilot format) | Markdown |
+| mcp/jetnet_mcp.py | MCP server: 11 tools for AI agents (Claude, Cursor, Copilot) | Python |
 | mcp/README.md | MCP setup, tool reference, example conversations | Markdown |

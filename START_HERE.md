@@ -106,6 +106,22 @@ system_prompt = open("prompts/01_golden_path_tail_lookup_app.md").read()
 
 ---
 
+### Path E: "I want zero-code AI agent access (MCP)"
+
+You want to connect Claude Desktop, Cursor, or any MCP-compatible AI directly to JETNET. No integration code needed -- the AI calls JETNET tools natively.
+
+**Start here:** [`mcp/README.md`](mcp/README.md)
+
+**What you'll get in 5 minutes:**
+1. Install: `pip install mcp httpx pydantic`
+2. Configure your MCP client (Claude Desktop, Cursor, etc.)
+3. Ask: "Look up N650GD and show me who owns it"
+4. Done. The AI handles auth, token refresh, pagination, and formatting.
+
+**Best for:** Business users who want data without writing code, developers using AI-assisted coding tools, and automation pipelines where LLMs orchestrate workflows.
+
+---
+
 ## Session Helpers
 
 We provide production-ready session modules that handle login, token refresh, and validation automatically:
@@ -127,4 +143,5 @@ These use `/api/Admin/getAccountInfo` as a lightweight health check to validate 
 | [Prompts](prompts/) | Paste into Cursor/Copilot to generate working apps |
 | [Model ID Lookup](references/model-ids.md) | Find the right `modlist` IDs for any aircraft make/model |
 | [Evals](evals/evals.json) | Test cases for validating AI agent responses |
+| [MCP Server](mcp/README.md) | Zero-code AI agent access to JETNET (Claude, Cursor, Copilot) |
 | [Full Endpoint Reference](references/endpoints.md) | Every endpoint with all parameters |

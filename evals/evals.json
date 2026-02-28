@@ -18,6 +18,41 @@
       "prompt": "I want to pull a report of all business jet ownership transactions from January 2023 through December 2024 -- basically who sold what to whom -- filtered to just Bombardier and Dassault aircraft. Export this to a CSV. Write me the script.",
       "expected_output": "A Python script that: (1) authenticates, (2) calls getHistoryList or getHistoryListPaged with maketype=BusinessJet, make filter or modlist for Bombardier/Dassault models, startdate=01/01/2023, enddate=12/31/2024, (3) handles pagination if needed, (4) writes results to CSV with relevant fields.",
       "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Using the JETNET MCP server, look up tail number N650GD and show me the complete aircraft profile with owner and operator information.",
+      "expected_output": "The agent calls jetnet_golden_path with registration='N650GD' and receives a response containing aircraftid, make, model, serialnbr, and relationships (owner/operator). The response should be formatted as markdown with aircraft specs table and owner/operator section.",
+      "category": "mcp",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Using the JETNET MCP server, find the model ID for a Gulfstream G550.",
+      "expected_output": "The agent calls jetnet_search_models with query='G550' and receives a result containing AMODID=145 for the Gulfstream G550. The agent explains this ID is used in modlist parameters of other tools.",
+      "category": "mcp",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Using the JETNET MCP server, search for G650s that are currently for sale in the United States. Show me the first 5 results.",
+      "expected_output": "The agent first calls jetnet_search_models with query='G650' to find the model IDs, then calls jetnet_search_fleet with the correct modlist, for_sale='true', country='United States', max_results=5. Results include regnbr and forsale fields.",
+      "category": "mcp",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Using the JETNET MCP server, get the owner and operator relationships for aircraft ID 211461.",
+      "expected_output": "The agent calls jetnet_get_relationships with aircraftid=211461 and receives relationship records containing relationtype and name fields for each relationship (Owner, Operator, Manager, etc.).",
+      "category": "mcp",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Using the JETNET MCP server, get flight data for aircraft ID 211461 from 1/1/2024 to 12/31/2024.",
+      "expected_output": "The agent calls jetnet_get_flight_data with aircraftid=211461, start_date='01/01/2024', end_date='12/31/2024'. If the date format '1/1/2024' is used instead, the tool should reject it because dates must be MM/DD/YYYY with leading zeros.",
+      "category": "mcp",
+      "files": []
     }
   ]
 }
