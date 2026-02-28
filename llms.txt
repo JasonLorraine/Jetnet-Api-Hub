@@ -231,8 +231,11 @@ Key behaviors:
 - evcategory and evtype enum values are STRICT. Unrecognized values return errors inside responsestatus (HTTP 200).
 - Use [] for both evcategory and evtype to return all events (safest default).
 - Call GET /api/Utility/getEventCategories/{apiToken} and POST /api/Utility/getEventTypes/{apiToken} to discover valid values.
+- Known categories: Aircraft Information, Company / Contact, Financial Documents, Market Status, Transaction.
+- Example types: Change in Aircraft Base, Change in Airframe Total Time, Ownership Transfer, For Sale / Off Market.
+- Priority: Transaction + Market Status = HIGH, Aircraft Information = MEDIUM, Financial Documents + Company/Contact = LOW.
 - Events explain WHY snapshots and trends changed (ownership transfers, listings, accidents, lifecycle transitions).
-- Use for: lifecycle timelines, market velocity, ownership churn, pre-listing detection, event-driven alerts.
+- Use for: lifecycle timelines, market velocity, ownership churn, pre-listing detection, event-driven alerts, signal engines.
 
 Analytics stack: EVENTS (raw) -> SNAPSHOTS (state) -> TRENDS (analytics).
 

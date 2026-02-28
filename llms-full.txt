@@ -243,8 +243,11 @@ Key behaviors:
 - evcategory and evtype enum values are STRICT. Unrecognized values return errors inside responsestatus (HTTP 200).
 - Use [] for both evcategory and evtype to return all events (safest default).
 - Call GET /api/Utility/getEventCategories/{apiToken} and POST /api/Utility/getEventTypes/{apiToken} to discover valid values.
+- Known categories: Aircraft Information, Company / Contact, Financial Documents, Market Status, Transaction.
+- Example types: Change in Aircraft Base, Change in Airframe Total Time, Ownership Transfer, For Sale / Off Market.
+- Priority: Transaction + Market Status = HIGH, Aircraft Information = MEDIUM, Financial Documents + Company/Contact = LOW.
 - Events explain WHY snapshots and trends changed (ownership transfers, listings, accidents, lifecycle transitions).
-- Use for: lifecycle timelines, market velocity, ownership churn, pre-listing detection, event-driven alerts.
+- Use for: lifecycle timelines, market velocity, ownership churn, pre-listing detection, event-driven alerts, signal engines.
 
 Analytics stack: EVENTS (raw) -> SNAPSHOTS (state) -> TRENDS (analytics).
 
@@ -2327,18 +2330,43 @@ Returns aircraft event records filtered by event category, event type, date rang
 | `modelid` | Single model filter | `0` = no filter |
 | `make` | Manufacturer filter | Case-insensitive. `""` = no filter. |
 
+### Event Categories and Event Types
+
+Events are classified into **categories** (domain groupings) and **types** (specific change signals). These turn events from a raw stream into typed, actionable intelligence.
+
+**Known event categories:**
+
+| Category | Covers |
+|----------|--------|
+| Aircraft Information | Base changes, airframe hours, registration, specs |
+| Company / Contact | Ownership, operator, contact updates |
+| Financial Documents | Financial record changes |
+| Market Status | For-sale listings, off-market, status transitions |
+| Transaction | Sales, leases, ownership transfers |
+
+**Example event types** (within categories):
+
+- Change in Aircraft Base
+- Change in Airframe Total Time
+- Ownership Transfer
+- For Sale / Off Market
+- Operator Change
+- Registration Change
+
+To discover all valid values, call the utility endpoints:
+
+```
+GET  /api/Utility/getEventCategories/{apiToken}
+POST /api/Utility/getEventTypes/{apiToken}  body: { "eventcategory": "Transaction" }
+```
+
+`getEventTypes` accepts a single `eventcategory` string and returns the valid types within that category.
+
 ### Enum Values Are Strict
 
 `evcategory` and `evtype` values must match exactly. Sending unrecognized values returns an error inside `responsestatus` even when HTTP status is 200.
 
-To get valid enum values, call the utility endpoints first:
-
-```
-GET  /api/Utility/getEventCategories/{apiToken}
-POST /api/Utility/getEventTypes/{apiToken}  body: { "eventcategory": "transaction" }
-```
-
-**Safe default:** Use `[]` for both `evcategory` and `evtype` to return all event types without guessing enum strings.
+**Safe default:** Use `[]` for both `evcategory` and `evtype` to return all event types without guessing enum strings. Always call the utility endpoints above to discover valid values before filtering.
 
 ---
 
@@ -2466,6 +2494,35 @@ Poll events on a schedule (hourly or daily) with a narrow date window to detect 
   "startdate": "02/27/2026",
   "enddate": "02/28/2026"
 }
+```
+
+---
+
+## Event Importance and Signal Priority
+
+Not all events carry equal weight. Classify events by category to drive notifications, dashboards, and scoring:
+
+| Priority | Categories | Signal Value |
+|----------|-----------|--------------|
+| **High** | Transaction, Market Status | Ownership transfers, for-sale/off-market transitions -- immediate market intelligence |
+| **Medium** | Aircraft Information | Base changes, hours updates, registration changes -- operational context |
+| **Low** | Financial Documents, Company / Contact | Record-keeping updates -- background enrichment |
+
+Use this classification to:
+- Filter alert subscriptions (only notify on high-priority events)
+- Build "What Changed Today" dashboards sorted by importance
+- Drive scoring models (high-priority events weighted more heavily)
+- Generate automated market intelligence summaries
+
+### Events as a Signal Engine
+
+Events are most valuable when treated as **actionable signals**, not a historical log:
+
+```
+CJ3+ changed base to KTEB    → notify regional broker
+G550 listed for sale          → trigger opportunity alert
+Ownership transfer on G200    → update company intelligence
+Airframe hours milestone      → flag upcoming maintenance
 ```
 
 ---
