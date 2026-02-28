@@ -33,7 +33,9 @@ Use snapshot mode for:
 
 ### Delta Mode
 
-Set `aircraftchanges` to `true`. Returns aircraft with qualifying changes since `actiondate`.
+Set `aircraftchanges` to `true`. Returns aircraft with qualifying changes **since your last API call**. The JETNET backend tracks when you last pulled data and returns only records that changed after that point.
+
+Use `actiondate` / `enddate` as additional date-range filters on the result set, but `aircraftchanges=true` itself means "since last call" -- not "since `actiondate`."
 
 ```json
 {
@@ -71,24 +73,22 @@ This is graph-level change detection. A contact phone number change on the owner
 
 ---
 
-## actiondate as a Watermark
+## actiondate / enddate as Date-Range Filters
 
-`actiondate` acts as a change cursor (watermark) for delta pulls:
+When using delta mode, `aircraftchanges=true` determines the change window (since last call). The `actiondate` and `enddate` fields act as **additional date-range filters** on the result set, not as the change cursor itself:
 
-- **Older dates** expand result size (more changes accumulated)
-- **Recent dates** reduce payloads but still rebuild full relational objects
-- **Empty** `actiondate` with `aircraftchanges=true` has no lower bound
+- **`actiondate`** -- lower bound of the date filter window
+- **`enddate`** -- upper bound of the date filter window
+- **Empty values** -- no date-range restriction (returns all qualifying changes since last call)
 
-For incremental sync, track your last successful pull timestamp and use it as the next `actiondate`:
+The JETNET backend automatically tracks your last call, so you do not need to manage a watermark yourself. Simply call with `aircraftchanges=true` on a regular schedule:
 
 ```python
-last_sync = load_last_sync_timestamp()
-
 body = {
     "modlist": [278, 288],
     "aircraftchanges": True,
-    "actiondate": last_sync.strftime("%m/%d/%Y %H:%M:%S"),
-    "enddate": datetime.now().strftime("%m/%d/%Y %H:%M:%S"),
+    "actiondate": "",
+    "enddate": "",
     "aclist": [],
     "maketype": "None",
     "airframetype": "None",
@@ -96,8 +96,9 @@ body = {
 }
 
 results = get_all_pages(bearer, token, path, body)
-save_last_sync_timestamp(datetime.now())
 ```
+
+Use `actiondate` / `enddate` when you need to narrow the date range further (e.g., hourly polling windows with `MM/DD/YYYY HH:MM:SS` format).
 
 ---
 
@@ -142,7 +143,7 @@ upsert_all(all_aircraft)
 
 ### Step 2: Periodic Delta Pulls
 
-Run delta pulls on a schedule (hourly, daily) using `aircraftchanges=true` and your last sync timestamp as `actiondate`.
+Run delta pulls on a schedule (hourly, daily) using `aircraftchanges=true`. The backend tracks your last call automatically -- you don't need to manage a watermark. Optionally use `actiondate` / `enddate` to narrow the date range.
 
 ### Step 3: Upsert Entire Records
 

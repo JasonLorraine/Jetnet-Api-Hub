@@ -139,12 +139,13 @@ GoldenPathResult: aircraftId, tailNumber, make, model, yearMfr, yearDelivered, c
 
 Two operating modes:
 - Snapshot: omit `aircraftchanges` -> full dataset matching filters
-- Delta: `aircraftchanges=true` + `actiondate` -> aircraft with changes since that timestamp
+- Delta: `aircraftchanges=true` -> aircraft with changes since your last API call (backend tracks this automatically)
 
 Key behaviors:
 - Delta uses graph-based change detection: aircraft qualifies if ANY related entity changes (ownership, contacts, events, flights) -- not just the aircraft record.
 - Delta returns full records, not field-level diffs. Always upsert entire records.
-- `actiondate` is a watermark/cursor. Accepts `MM/DD/YYYY HH:MM:SS` for hourly polling.
+- `aircraftchanges=true` means "since last call" -- the backend tracks the cursor, not the client.
+- `actiondate`/`enddate` are optional date-range filters, not the change cursor. Accepts `MM/DD/YYYY HH:MM:SS`.
 - Entity counts scale nonlinearly: each aircraft expands into companies, contacts, phones, events, flight summaries.
 - Always scope with `modlist` or `aclist`. Unbounded queries create massive payloads.
 - Response uses flat prefixed schema: owr* (owner), opr* (operator), chp* (chief pilot).
