@@ -314,6 +314,7 @@ See the full working implementation:
 | [Model Data](docs/model-data.md) | Operation costs, performance specs, model intelligence |
 | [Airports](docs/airports.md) | Airport reference data, geographic dimension table |
 | [Utility Endpoints](docs/utility-endpoints.md) | Cacheable reference tables: lifecycle, makes, models, sizes, types |
+| [JETNET Lite](docs/jetnet-lite.md) | Reference architecture: tail number → full dashboard in 7 API calls |
 | [Data Model](docs/data-model.md) | Aircraft ↔ Company ↔ Contact entity graph and relationship traversal |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
@@ -367,6 +368,13 @@ Benchmark aircraft valuations against market data -- asking prices, transaction 
 
 **Endpoints:** `getModelMarketTrends`, `getHistoryListPaged`, `getFlights`, `getModelOperationCosts`
 **Docs:** [Trends](docs/trends.md) | [History](docs/history.md) | [Flight Data](docs/flight-data.md)
+
+### Tail Number Research Portal (JETNET Lite)
+
+Build a lightweight lookup tool -- enter a tail number, get a complete dashboard: aircraft profile, owner/operator relationships, company profile, decision-maker contacts, flight activity, and transaction history. Works as a web app, mobile tool, or embedded widget. One input, seven API calls, full intelligence.
+
+**Call sequence:** `getRegNumber` → `getAircraft` → `getRelationships` → `getFlightDataPaged` → `getHistoryListPaged` → `getContactList` → `getCompanyList`
+**Docs:** [JETNET Lite Architecture](docs/jetnet-lite.md) | [Data Model](docs/data-model.md) | [Response Shapes](docs/response-shapes.md) | [Common Mistakes](docs/common-mistakes.md)
 
 ---
 

@@ -21,6 +21,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `model-data.md` - Model reference: getModelOperationCosts, getModelPerformanceSpecs, getModelIntelligence
   - `airports.md` - Airport reference data: getAirportList, geographic dimension table for joins
   - `utility-endpoints.md` - Cacheable reference/dimension tables: lifecycle, makes, models, JNIQ sizes, airframe types, event categories
+  - `jetnet-lite.md` - Reference architecture: tail number research portal (JETNET Lite) — 7-step API call sequence, dashboard layout, parallelization, caching
   - `data-model.md` - Entity graph: Aircraft (aircraftid) ↔ Company (companyid) ↔ Contact (contactid) relationships, Golden Path traversal, best practices
   - `aircraft.md` - 21 Aircraft endpoints: getAircraft (full record), 14 sub-record GETs (identification, airframe, engine, apu, avionics, features, additionalequipment, interior, exterior, maintenance, leases, pictures, status, companyrelationships), tail/hex lookup (getRegNumber, getHexNumber), fleet search (getAircraftList), batch relationships, getAllAircraftObjects
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
