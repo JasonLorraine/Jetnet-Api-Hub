@@ -189,6 +189,24 @@ Key behaviors:
 
 Use cases: historical fleet composition, "who owned this in year X?", market comparison across years, country fleet growth analysis.
 
+## Model Market Trends (getModelMarketTrends)
+
+POST /api/Model/getModelMarketTrends/{apiToken}
+
+Monthly time-series at model-level granularity. One record per model per month.
+
+Request: modlist (array of model IDs), displayRange (months), startdate (MM/DD/YYYY).
+Response key: `modelMarketTrends` (camelCase with capital M).
+
+Key fields per record: trend_year, trend_month, aircraft_for_sale_count, in_operation_count, avg_asking_price, high_asking_price, low_asking_price, avg_daysonmarket, avg_airframe_time, avg_engine_time, domestic_count, international_count, dealer_owned_count, end_user_count.
+
+Derived metrics:
+- Supply Pressure = aircraft_for_sale_count / in_operation_count
+- Liquidity Score = inverse of avg_daysonmarket slope
+- Price Trend Index = MoM change in avg_asking_price
+
+Combine with Snapshots (state), History (transactions), and Flight Data (utilization) for full longitudinal analytics. See docs/trends.md for composite indicators and architecture.
+
 ## Flight Data Endpoints
 
 Two endpoints for flight intelligence:
@@ -223,6 +241,7 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 | docs/bulk-export.md | Bulk export: snapshot/delta, graph change detection | Markdown |
 | docs/history.md | Transaction history: ownership timeline, sales, leases | Markdown |
 | docs/snapshots.md | Historical fleet state at a point in time | Markdown |
+| docs/trends.md | Market trends & time-series analytics | Markdown |
 | docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |

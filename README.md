@@ -186,6 +186,7 @@ jetnet-api-docs/
 │   ├── bulk-export.md                 ← Bulk export: snapshot/delta, change detection
 │   ├── history.md                     ← Transaction history & ownership timeline
 │   ├── snapshots.md                   ← Historical fleet state at a point in time
+│   ├── trends.md                      ← Market trends & time-series analytics
 │   ├── flight-data.md                 ← Flight activity & monthly utilization
 │   ├── common-mistakes.md              ← Every gotcha and how to fix it
 │   └── enum-reference.md              ← Valid values for every enum field
@@ -268,6 +269,7 @@ See the full working implementation:
 | [Bulk Export](docs/bulk-export.md) | Snapshot vs delta mode, graph-based change detection, integration pattern |
 | [History](docs/history.md) | Transaction events: ownership timeline, comparable sales, leasing intelligence |
 | [Snapshots](docs/snapshots.md) | Historical fleet state at a point in time (`getCondensedSnapshot`) |
+| [Trends](docs/trends.md) | Market trends & time-series analytics: combining endpoints for longitudinal analysis |
 | [Flight Data](docs/flight-data.md) | Flight activity + monthly utilization: getFlightData vs getFlights |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |

@@ -14,6 +14,7 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `bulk-export.md` - Bulk export: snapshot vs delta mode, graph-based change detection, entity scaling, integration pattern
   - `history.md` - Transaction history: ownership timeline, comparable sales, leasing intelligence, enrichment pattern
   - `snapshots.md` - Historical fleet state: getCondensedSnapshot, snapshotdate, non-paged, caching strategy
+  - `trends.md` - Market trends & time-series: getModelMarketTrends, composite indicators, data collection architecture
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps
