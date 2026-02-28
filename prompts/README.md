@@ -10,6 +10,7 @@ starter code.
 | `02_fbo_airport_activity_leads.md` | FBO ramp-to-lead enrichment | getRegNumber loop |
 | `03_fleet_watchlist_alerts.md` | Fleet change monitoring alerts | getBulkAircraftExportPaged |
 | `04_bulk_export_pipeline.md` | Hourly market intelligence feed | getBulkAircraftExportPaged |
+| `05_mcp_agent_workflow.md` | Natural language queries via MCP -- no code, just data | MCP server (11 tools) |
 
 ## How to use
 

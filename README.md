@@ -14,8 +14,27 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 
 ---
 
+## Mission
+
+**JETNET API HUB removes the friction between raw aviation data and real-world workflows.**
+
+The data exists -- aircraft, ownership, operators, contacts, flight behavior, market signals. The friction is in translating endpoints into workflows, linking aircraft to companies and people, and turning tail numbers into decision-ready intelligence.
+
+Customers don't ask for endpoints. They ask: *"Tell me everything about this tail." "Who actually operates this aircraft?" "Who should I call?" "Is this operator about to sell?"*
+
+This repository eliminates that friction:
+
+- **Endpoint friction** -- Authentication, token placement, pagination, date formats, and relationship traversal are standardized through session helpers and guardrails.
+- **Data model friction** -- Raw API gives you Aircraft, Company, Contact as separate entities. Real workflows require Aircraft → Company → Contact → Behavior → Signal → Action. The [Data Model](docs/data-model.md) and [Golden Path](#the-golden-path) make that traversal explicit.
+- **Integration friction** -- Session helpers, starter templates, and the MCP server bridge the gap between raw JSON and CRM objects, automation triggers, and AI agent workflows.
+
+We don't build endpoint catalogs. We build workflow accelerators.
+
+---
+
 ## Table of Contents
 
+- [Mission](#mission)
 - [Quick Start](#quick-start)
 - [Run on Replit](#run-on-replit)
 - [Token Validation Strategy](#token-validation-strategy)
@@ -295,6 +314,7 @@ See the full working implementation:
 | [Model Data](docs/model-data.md) | Operation costs, performance specs, model intelligence |
 | [Airports](docs/airports.md) | Airport reference data, geographic dimension table |
 | [Utility Endpoints](docs/utility-endpoints.md) | Cacheable reference tables: lifecycle, makes, models, sizes, types |
+| [Data Model](docs/data-model.md) | Aircraft ↔ Company ↔ Contact entity graph and relationship traversal |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |

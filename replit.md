@@ -4,7 +4,7 @@
 A comprehensive public documentation repository for the JETNET API (Jetnet Connect) -- the aviation industry's aircraft intelligence database. Contains documentation, code examples, helper scripts, AI prompts, starter templates, session helpers, and eval test cases. Targets vibe coders, developers, and JETNET API customers.
 
 ## Structure
-- `START_HERE.md` - Choose your adventure entry point (4 paths: demo UI, bulk data, CRM enrichment, AI agent)
+- `START_HERE.md` - Choose your adventure entry point (5 paths: demo UI, bulk data, CRM enrichment, AI agent, MCP zero-code)
 - `llms.txt` - Concise AI/LLM reference (~150 lines, fits small context windows)
 - `llms-full.txt` - Complete AI/LLM reference (~3100 lines, all docs concatenated)
 - `src/jetnet/` - Session helpers (Python + TypeScript) with auto-refresh and /getAccountInfo validation
@@ -21,13 +21,14 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `model-data.md` - Model reference: getModelOperationCosts, getModelPerformanceSpecs, getModelIntelligence
   - `airports.md` - Airport reference data: getAirportList, geographic dimension table for joins
   - `utility-endpoints.md` - Cacheable reference/dimension tables: lifecycle, makes, models, JNIQ sizes, airframe types, event categories
+  - `data-model.md` - Entity graph: Aircraft (aircraftid) ↔ Company (companyid) ↔ Contact (contactid) relationships, Golden Path traversal, best practices
   - `aircraft.md` - 21 Aircraft endpoints: getAircraft (full record), 14 sub-record GETs (identification, airframe, engine, apu, avionics, features, additionalequipment, interior, exterior, maintenance, leases, pictures, status, companyrelationships), tail/hex lookup (getRegNumber, getHexNumber), fleet search (getAircraftList), batch relationships, getAllAircraftObjects
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps
   - `nextjs-tail-lookup/` - Next.js 14 App Router + Tailwind: lib/jetnet.ts, lib/normalize.ts, app/api/aircraft/route.ts (POST), app/page.tsx
   - `python-fastapi-golden-path/` - FastAPI with local jetnet/session.py copy, /lookup?tail= endpoint, lifespan-based session init
-- `prompts/` - AI prompts for Cursor/Copilot/ChatGPT (4 recipes: tail lookup, FBO leads, fleet watchlist, bulk export)
+- `prompts/` - AI prompts for Cursor/Copilot/ChatGPT (5 recipes: tail lookup, FBO leads, fleet watchlist, bulk export, MCP agent workflow)
 - `examples/python/` - 8 Python examples (requests + Flask)
 - `examples/javascript/` - 8 JavaScript examples (fetch + Express)
 - `examples/responses/` - 16 known-good JSON response examples from v5 (tail-lookup, bulk-export, history, relationships, etc.)

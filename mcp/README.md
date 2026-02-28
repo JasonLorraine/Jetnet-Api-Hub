@@ -278,10 +278,8 @@ These endpoints could be added as tools following the same pattern:
 
 | Endpoint | Use Case | Priority |
 |----------|----------|----------|
-| `getCondensedSnapshot` | Fleet snapshot at a point in time | High |
 | `getCompanyList` | Search companies by name/type | Medium |
 | `getContactList` | Search contacts | Medium |
-| `getModelPerformanceSpecs` | Aircraft specs (range, speed, cabin) | Medium |
 | `getModelOperationCosts` | Annual operating costs | Medium |
 | `getAirportList` | Airport reference data | Low |
 | `getBulkAircraftExportPaged` | Bulk data sync (Tier B — not for interactive) | Low |

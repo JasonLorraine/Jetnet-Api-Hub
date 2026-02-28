@@ -72,6 +72,8 @@ You want to enrich contacts, generate leads, or monitor ownership changes.
 
 ### Path D: "I'm building an AI agent / code agent"
 
+> **Want zero-code MCP instead?** Skip to [Path E](#path-e-i-want-zero-code-ai-agent-access-mcp) below.
+
 You want to give an AI agent (Cursor, Copilot, custom GPT, LangChain, CrewAI, or your own) the ability to call the JETNET API.
 
 **Quickest path:** Feed [`llms.txt`](llms.txt) into your agent's context window. It contains every rule, gotcha, enum value, and response key in ~150 lines. For agents with large context windows, use [`llms-full.txt`](llms-full.txt) (~3100 lines, all docs).

@@ -1,6 +1,6 @@
 [project]
 name = "jetnet-api-docs"
-version = "1.0.0"
+version = "1.1.0"
 description = "JETNET API Documentation & Examples - Complete developer guide for the JETNET aviation database API"
 requires-python = ">=3.11"
 dependencies = [
