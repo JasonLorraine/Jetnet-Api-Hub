@@ -54,6 +54,126 @@ Different endpoints use different field names for the relationship type. Using t
 
 See [Response Handling](response-handling.md) for the full schema comparison.
 
+### `"SUCCESS: NO RESULTS FOUND"` is a normal response
+
+Several endpoints return `responsestatus` values like `"SUCCESS: NO RESULTS FOUND [PHONE NUMBERS]"` when a query matches zero records. This is **not an error** — it is a valid business state. Use a prefix check, not strict equality:
+
+```python
+# Wrong — breaks on "SUCCESS: NO RESULTS FOUND [...]"
+if result["responsestatus"] != "SUCCESS":
+    raise ValueError("Request failed")
+
+# Correct — treats any SUCCESS prefix as OK
+if not result.get("responsestatus", "").upper().startswith("SUCCESS"):
+    raise ValueError(f"JETNET error: {result['responsestatus']}")
+```
+
+```javascript
+// Wrong
+if (data.responsestatus !== "SUCCESS") throw new Error("Failed");
+
+// Correct
+if (!(data.responsestatus || "").toUpperCase().startsWith("SUCCESS")) {
+  throw new Error(`JETNET error: ${data.responsestatus}`);
+}
+```
+
+### Null arrays — guard before iterating
+
+Fields like `phonenumbers`, `relatedcompanies`, and `companycertifications` return `null` (not `[]`) when empty. Any code calling `.map()` or `.forEach()` without a guard will crash:
+
+```python
+# Wrong — TypeError if phonenumbers is None
+for p in result["phonenumbers"]:
+    print(p)
+
+# Correct
+for p in result.get("phonenumbers") or []:
+    print(p)
+```
+
+```javascript
+// Wrong — Cannot read properties of null
+data.phonenumbers.map(p => p.number);
+
+// Correct
+(data.phonenumbers ?? []).map(p => p.number);
+```
+
+### `isoperator` is a `"Y"` / `"N"` string
+
+In relationship data, `isoperator` is a string, not a boolean:
+
+```python
+# Wrong — always truthy because "N" is a non-empty string
+if record["isoperator"]:
+
+# Correct
+if record["isoperator"] == "Y":
+```
+
+## URL Shape Variations
+
+### Mixed URL patterns across endpoints
+
+JETNET endpoints use three different URL patterns. Trying to build all paths with a single template will break:
+
+```
+# Pattern 1: POST body + token only
+POST /api/Contact/getContactList/{apiToken}
+
+# Pattern 2: Resource ID + token
+GET /api/Contact/getContact/{contactId}/{apiToken}
+
+# Pattern 3: Token + pagination in path
+POST /api/Aircraft/getHistoryListPaged/{apiToken}/{pageSize}/{page}
+```
+
+Build your URL helper to accept optional `id`, `pageSize`, and `page` parameters rather than assuming one shape fits all.
+
+## N+1 and Fan-Out Risks
+
+### Company → Contacts returns ID arrays, not full objects
+
+`getContacts` (`/api/Company/getContacts/{companyId}/{apiToken}`) returns contact IDs as a plain array — not hydrated contact objects:
+
+```json
+{ "contacts": [523097, 282591, 198443] }
+```
+
+To get full contact data, you must call `getContact` or `getIdentification` for **each** ID. This creates an N+1 fan-out problem. Mitigate with concurrency limits:
+
+```python
+import asyncio
+
+sem = asyncio.Semaphore(5)
+
+async def fetch_contact(session, contact_id):
+    async with sem:
+        return await session.get(f".../getContact/{contact_id}/{token}")
+
+tasks = [fetch_contact(session, cid) for cid in contact_ids]
+contacts = await asyncio.gather(*tasks)
+```
+
+```javascript
+// Limit concurrency to 5 at a time
+const pLimit = (await import("p-limit")).default;
+const limit = pLimit(5);
+
+const contacts = await Promise.all(
+  contactIds.map(id => limit(() => fetchContact(id)))
+);
+```
+
+### `ownerpercent` can be null even when relationship exists
+
+Do not assume `ownerpercent` or `fractionexpiresdate` are always populated on ownership/fractional relationships. Always provide a fallback:
+
+```python
+pct = record.get("ownerpercent") or "0.00"
+```
+
 ## Filters and Payloads
 
 ### Empty `aclist: []` means no filter, not empty results

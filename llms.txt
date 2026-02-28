@@ -255,6 +255,98 @@ getFlights (GET) -- GET /api/Aircraft/getFlights/{aircraftId}/{apiToken}
 
 Use getFlightData for route intelligence and emissions. Use getFlights for monthly trend analysis.
 
+## Contact Endpoints
+
+Contact is a relationship hub connecting companies, aircraft, and listings. Join key: contactid.
+
+getContactListPaged (POST, paged) -- Search contacts by name, company, role.
+  Response key: contactlist. Fields: contactid, firstname, lastname, title, companyname, companyid.
+
+getContact (GET) -- Full contact record by contactid.
+  URL: /api/Contact/getContact/{contactId}/{apiToken}
+  Response key: contact. Fields: contactid, firstname, lastname, title, suffix, companyname, companyid, address fields.
+
+getIdentification (GET) -- Lightweight identification record.
+  URL: /api/Contact/getIdentification/{contactId}/{apiToken}
+
+getPhonenumbers (GET) -- Phone numbers for a contact. Returns null (not []) when empty.
+  URL: /api/Contact/getPhonenumbers/{contactId}/{apiToken}
+
+getOtherlistings (GET) -- Alternate company/contact associations.
+  URL: /api/Contact/getOtherlistings/{contactId}/{apiToken}
+
+getContAircraftRelationships (GET) -- Aircraft linked to a contact with relationship type.
+  URL: /api/Contact/getContAircraftRelationships/{contactId}/{apiToken}
+
+Workflow: search (getContactListPaged) → verify (getIdentification) → full profile (getContact) → aircraft linkage (getContAircraftRelationships) → phones → other listings.
+
+## Company Endpoints
+
+Company is the organizational node linking contacts, aircraft, and certifications. Join key: companyid.
+
+getCompanyListPaged (POST, paged) -- Search companies by name, type, location.
+  Response key: companylist. Fields: companyid, companyname, city, state, country.
+
+getCompany (POST) -- Full company record by companyid.
+  Response key: company. Includes nested objects.
+
+getContacts (GET) -- Returns contact ID arrays only (not full objects). N+1 fan-out risk.
+  URL: /api/Company/getContacts/{companyId}/{apiToken}
+
+getAircraftrelationships (GET) -- Aircraft tied to company with relationship details.
+  isoperator is "Y"/"N" string, not boolean. ownerpercent can be null.
+
+getRelatedcompanies (GET) -- Parent/child/affiliated companies. Returns null (not []) when empty.
+
+getCompanyCertifications (GET) -- Regulatory certifications.
+
+getCompanyHistory / getCompanyHistoryPaged -- Transaction history for a company.
+
+Workflow: search (getCompanyListPaged) → validate (getCompany) → expand (getContacts, getAircraftrelationships) → link.
+
+## Model Reference Endpoints
+
+Four model-level endpoints keyed by modelid (AMODID). Cross-reference: references/model-id-table.json.
+
+getModelMarketTrends (POST) -- See docs/trends.md. Response key: modelMarketTrends (camelCase).
+
+getModelOperationCosts (POST) -- Operating cost projections. Response key: modeloperationcosts (lowercase).
+  Key fields: fuel burn rate, cost categories, annualhours, fuelprice projections.
+  Request body: ModelPerformanceOptions with modelid.
+
+getModelPerformanceSpecs (POST) -- Airframe specs. Response key: modelperformancespecs (lowercase).
+  Key fields: fuselage dimensions, cabin specs, range, speed, ceiling.
+
+getModelIntelligence (POST) -- Model-level intelligence summary.
+
+IMPORTANT: Response key casing is inconsistent -- modelMarketTrends (camelCase) vs modeloperationcosts/modelperformancespecs (lowercase).
+
+## Airport Reference
+
+getAirportList (POST) -- Geographic dimension table. Cache aggressively (low change frequency).
+  URL: /api/Utility/getAirportList/{apiToken}
+  Request params: name, city, state, statename, country, iata, icao, faaid.
+  Response fields: airportid, name, city, state, country, iata, icao, faaid.
+  Use ICAO as canonical key. Joins with flight data, events, snapshots for geographic analysis.
+
+## Utility / Reference Endpoints
+
+Cacheable dimension tables forming the metadata backbone. All via /api/Utility/.
+
+getAircraftLifecycleStatus -- Lifecycle enum values. Cache: static (months).
+getAircraftMakeList -- Manufacturer taxonomy. Cache: long-lived (weekly).
+getAircraftModelList -- Model catalog with modelid, weightclass, categorysize. Cache: long-lived (weekly).
+getAirframeJniqSizes -- JNIQ size categories. Cache: static.
+getAirframeTypes -- FixedWing, Rotary. Cache: static.
+getMakeTypeList -- Make type taxonomy. Cache: long-lived.
+getWeightClassTypes -- Weight class categories. Cache: static.
+getEventCategories -- 5 event categories. Cache: static.
+getEventTypes -- Event type enum per category. Cache: static.
+getCompanyBusinessTypes -- Business type taxonomy. Cache: long-lived.
+getCountryList / getStateList -- Geographic reference. Cache: static.
+
+Strategy: load all static endpoints once at startup, cache long-lived weekly, refresh session-level daily.
+
 ## File Manifest
 
 | File | Purpose | Format |
@@ -276,6 +368,11 @@ Use getFlightData for route intelligence and emissions. Use getFlights for month
 | docs/trends.md | Market trends & time-series analytics | Markdown |
 | docs/events.md | Aircraft events: lifecycle changes, causal layer | Markdown |
 | docs/flight-data.md | Flight endpoints: getFlightData + getFlights | Markdown |
+| docs/contacts.md | 7 Contact endpoints: lookup, search, aircraft relationships | Markdown |
+| docs/companies.md | 9 Company endpoints: profile, search, aircraft, history | Markdown |
+| docs/model-data.md | Model specs, costs, intelligence | Markdown |
+| docs/airports.md | Airport reference data, geographic dimension table | Markdown |
+| docs/utility-endpoints.md | Cacheable reference/dimension tables | Markdown |
 | docs/pagination.md | Pagination patterns | Markdown |
 | docs/response-handling.md | Schema differences by endpoint | Markdown |
 | docs/id-system.md | ID types and usage | Markdown |

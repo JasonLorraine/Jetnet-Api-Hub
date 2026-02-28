@@ -16,6 +16,11 @@ A comprehensive public documentation repository for the JETNET API (Jetnet Conne
   - `snapshots.md` - Historical fleet state: getCondensedSnapshot, snapshotdate, non-paged, caching strategy
   - `trends.md` - Market trends & time-series: getModelMarketTrends, composite indicators, data collection architecture
   - `events.md` - Aircraft events: getEventListPaged, lifecycle changes, market velocity, causal analytics layer
+  - `contacts.md` - 7 Contact endpoints: getContact, getContactList(Paged), getIdentification, getPhonenumbers, getOtherlistings, getContAircraftRelationships
+  - `companies.md` - 9 Company endpoints: getCompany, getIdentification, getPhonenumbers, getRelatedcompanies, getAircraftrelationships, getCompanyCertifications, getCompanyHistory, getCompanyList(Paged)
+  - `model-data.md` - Model reference: getModelOperationCosts, getModelPerformanceSpecs, getModelIntelligence
+  - `airports.md` - Airport reference data: getAirportList, geographic dimension table for joins
+  - `utility-endpoints.md` - Cacheable reference/dimension tables: lifecycle, makes, models, JNIQ sizes, airframe types, event categories
   - `flight-data.md` - Flight data integration: getFlightData (per-flight detail) vs getFlights (monthly summary), ingestion strategy, CRM signals
   - `response-shapes.md` - Normalized UI contracts: AircraftCard, CompanyCard, ContactCard, GoldenPathResult with Python/TS factories
 - `templates/` - One-click starter apps

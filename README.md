@@ -190,6 +190,11 @@ jetnet-api-docs/
 │   ├── trends.md                      ← Market trends & time-series analytics
 │   ├── events.md                      ← Aircraft events: the causal/atomic layer
 │   ├── flight-data.md                 ← Flight activity & monthly utilization
+│   ├── contacts.md                    ← Contact endpoints & CRM workflows
+│   ├── companies.md                   ← Company endpoints & relationship graph
+│   ├── model-data.md                  ← Model specs, costs, intelligence
+│   ├── airports.md                    ← Airport reference data & geographic joins
+│   ├── utility-endpoints.md           ← Reference/dimension tables (cacheable)
 │   ├── common-mistakes.md              ← Every gotcha and how to fix it
 │   └── enum-reference.md              ← Valid values for every enum field
 │
@@ -274,6 +279,11 @@ See the full working implementation:
 | [Trends](docs/trends.md) | Market trends & time-series analytics: combining endpoints for longitudinal analysis |
 | [Events](docs/events.md) | Aircraft events: discrete lifecycle changes, market velocity, causal analytics |
 | [Flight Data](docs/flight-data.md) | Flight activity + monthly utilization: getFlightData vs getFlights |
+| [Contacts](docs/contacts.md) | 7 Contact endpoints: lookup, search, phones, aircraft relationships |
+| [Companies](docs/companies.md) | 9 Company endpoints: profile, search, aircraft ties, history |
+| [Model Data](docs/model-data.md) | Operation costs, performance specs, model intelligence |
+| [Airports](docs/airports.md) | Airport reference data, geographic dimension table |
+| [Utility Endpoints](docs/utility-endpoints.md) | Cacheable reference tables: lifecycle, makes, models, sizes, types |
 | [ID System](docs/id-system.md) | `aircraftid` vs `regnbr` vs `modelid` vs `companyid` |
 | [Common Mistakes](docs/common-mistakes.md) | Every known gotcha with explanations and fixes |
 | [Enum Reference](docs/enum-reference.md) | Valid values for `airframetype`, `maketype`, `transtype`, etc. |
