@@ -15,6 +15,7 @@ The complete developer guide for working with the JETNET API (Jetnet Connect) --
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Run on Replit](#run-on-replit)
 - [Token Validation Strategy](#token-validation-strategy)
 - [Repository Structure](#repository-structure)
 - [The Golden Path](#the-golden-path)
@@ -109,6 +110,33 @@ That's it. You're connected.
 For production apps, use the session helpers instead of managing tokens manually:
 - **Python:** [`src/jetnet/session.py`](src/jetnet/session.py)
 - **TypeScript:** [`src/jetnet/session.ts`](src/jetnet/session.ts)
+
+## Run on Replit
+
+### Option A -- Python (recommended)
+
+1. **Create a Repl** -- Go to Replit, click **Create Repl**, choose **Python**, and import this repo (or paste the GitHub URL).
+2. **Add credentials** -- Open **Tools > Secrets** (padlock icon) and add:
+   - `JETNET_EMAIL` = your login email
+   - `JETNET_PASSWORD` = your password
+3. **Install dependencies** -- In the Shell: `pip install -r requirements.txt`
+4. **Run a demo** -- `python examples/python/02_tail_lookup.py N650GD`
+
+### Option B -- Node.js
+
+1. **Create a Repl** -- Choose **Node.js** and import this repo.
+2. **Add credentials** -- Same as above: `JETNET_EMAIL` and `JETNET_PASSWORD` in **Secrets**.
+3. **Install dependencies** -- In the Shell: `npm install`
+4. **Run a demo** -- `node examples/javascript/02_tail_lookup.js N650GD`
+
+### Troubleshooting (Replit)
+
+| Issue | Fix |
+|-------|-----|
+| Missing env vars | Set `JETNET_EMAIL` and `JETNET_PASSWORD` in **Secrets**, then restart the Repl |
+| Auth/token errors | Tokens expire after 60 min; the examples re-login automatically. Re-run the command. |
+| Module not found | Run `pip install -r requirements.txt` (Python) or `npm install` (Node) |
+| Wrong working directory | Run commands from the repo root (where `examples/` lives) |
 
 ## Token Validation Strategy
 
